@@ -1,0 +1,43 @@
+// firestore.rules
+// Colle ce contenu dans Firebase Console → Firestore → Rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Seuls les utilisateurs authentifiés et autorisés ont accès ──
+    function isAllowed() {
+      return request.auth != null &&
+        request.auth.token.email in [
+          'theo@orgadeplat.fr',
+          'elodie@orgadeplat.fr'
+        ];
+    }
+
+    // Plats
+    match /dishes/{dishId} {
+      allow read, write: if isAllowed();
+    }
+
+    // Idées
+    match /ideas/{ideaId} {
+      allow read, write: if isAllowed();
+    }
+
+    // Planning hebdomadaire
+    match /weekPlans/{weekKey} {
+      allow read, write: if isAllowed();
+    }
+
+    // Fil d'activité
+    match /activity/{actId} {
+      allow read, create: if isAllowed();
+      allow update, delete: if false; // immuable
+    }
+
+    // Configuration (catégories, etc.)
+    match /config/{docId} {
+      allow read, write: if isAllowed();
+    }
+  }
+}
