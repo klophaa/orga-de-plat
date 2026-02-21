@@ -17,12 +17,12 @@ import {
 // ─── FIREBASE CONFIG — remplace avec tes propres valeurs ─────────────────────
 // (voir guide de déploiement)
 const firebaseConfig = {
-  apiKey: "AIzaSyAEkCPxcQERPI3m8o5XBz3TjyYOlOjlbK4",
-  authDomain: "orga-de-plat.firebaseapp.com",
-  projectId: "orga-de-plat",
-  storageBucket: "orga-de-plat.firebasestorage.app",
+  apiKey:            "AIzaSyAEkCPxcQERPI3m8o5XBz3TjyYOlOjlbK4",
+  authDomain:        "orga-de-plat.firebaseapp.com",
+  projectId:         "orga-de-plat",
+  storageBucket:     "orga-de-plat.firebasestorage.app",
   messagingSenderId: "569810560696",
-  appId: "1:569810560696:web:de7818a6d5293b0aa2764d"
+  appId:             "1:569810560696:web:de7818a6d5293b0aa2764d",
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -618,7 +618,25 @@ export default function App() {
     const set = (k,v) => setForm(f=>({...f,[k]:v}));
     const myTaste    = form.tasteByUser?.[currentUser] || 3;
     const setMyTaste = v => set("tasteByUser",{...form.tasteByUser,[currentUser]:v});
-    const handlePhoto = e => { const f=e.target.files[0]; if(!f)return; const reader=new FileReader(); reader.onload=ev=>{const img=new Image();img.onload=()=>{const canvas=document.createElement("canvas");const MAX=400;const ratio=Math.min(MAX/img.width,MAX/img.height);canvas.width=img.width*ratio;canvas.height=img.height*ratio;canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);set("photo",canvas.toDataURL("image/jpeg",0.7));};img.src=ev.target.result;};reader.readAsDataURL(f);};
+    const handlePhoto = e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX = 400;
+          const ratio = Math.min(MAX / img.width, MAX / img.height);
+          canvas.width = img.width * ratio;
+          canvas.height = img.height * ratio;
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          set("photo", canvas.toDataURL("image/jpeg", 0.7));
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(f);
+    };
 
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -637,7 +655,7 @@ export default function App() {
               {form.photo?<img src={form.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
             </div>
             <label style={{...s.ghost,fontSize:13,cursor:"pointer",padding:"8px 14px"}}>
-              📷 Choisir <input type="file" accept="image/*" style={{display:"none"}} onChange={const handlePhoto = e => {   const f = e.target.files[0];   if (!f) return;   const reader = new FileReader();   reader.onload = ev => {     const img = new Image();     img.onload = () => {       const canvas = document.createElement("canvas");       const MAX = 400;       const ratio = Math.min(MAX / img.width, MAX / img.height);       canvas.width = img.width * ratio;       canvas.height = img.height * ratio;       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);       set("photo", canvas.toDataURL("image/jpeg", 0.7));     };     img.src = ev.target.result;   };   reader.readAsDataURL(f); };}/>
+              📷 Choisir <input type="file" accept="image/*" style={{display:"none"}} onChange={handlePhoto}/>
             </label>
             {form.photo && <button onClick={()=>set("photo",null)} style={{...s.iconBtn,color:T.danger}}>✕</button>}
           </div>
@@ -673,7 +691,26 @@ export default function App() {
   const IdeaForm = ({initial, onSave, onCancel}) => {
     const [form, setForm] = useState(initial || {title:"",note:"",link:"",photo:null,tested:false});
     const set = (k,v) => setForm(f=>({...f,[k]:v}));
-    const handlePhoto = e => { const f=e.target.files[0]; if(!f)return; const reader=new FileReader(); reader.onload=ev=>{const img=new Image();img.onload=()=>{const canvas=document.createElement("canvas");const MAX=400;const ratio=Math.min(MAX/img.width,MAX/img.height);canvas.width=img.width*ratio;canvas.height=img.height*ratio;canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);set("photo",canvas.toDataURL("image/jpeg",0.7));};img.src=ev.target.result;};reader.readAsDataURL(f);};
+    const handlePhoto = e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX = 400;
+          const ratio = Math.min(MAX / img.width, MAX / img.height);
+          canvas.width = img.width * ratio;
+          canvas.height = img.height * ratio;
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          set("photo", canvas.toDataURL("image/jpeg", 0.7));
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(f);
+    };
+    return (
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
         <div>
           <label style={s.label}>Titre</label>
@@ -694,7 +731,7 @@ export default function App() {
               {form.photo?<img src={form.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"💡"}
             </div>
             <label style={{...s.ghost,fontSize:13,cursor:"pointer",padding:"8px 14px"}}>
-              📷 Ajouter <input type="file" accept="image/*" style={{display:"none"}} onChange={const handlePhoto = e => {   const f = e.target.files[0];   if (!f) return;   const reader = new FileReader();   reader.onload = ev => {     const img = new Image();     img.onload = () => {       const canvas = document.createElement("canvas");       const MAX = 400;       const ratio = Math.min(MAX / img.width, MAX / img.height);       canvas.width = img.width * ratio;       canvas.height = img.height * ratio;       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);       set("photo", canvas.toDataURL("image/jpeg", 0.7));     };     img.src = ev.target.result;   };   reader.readAsDataURL(f); };}/>
+              📷 Ajouter <input type="file" accept="image/*" style={{display:"none"}} onChange={handlePhoto}/>
             </label>
           </div>
         </div>
