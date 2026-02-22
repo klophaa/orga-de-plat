@@ -307,7 +307,7 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
           )}
           {/* Favori — haut droit */}
           {dish.favorite && (
-            <div style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,0.55)",borderRadius:8,padding:"4px 6px",fontSize:14,lineHeight:1}}>
+            <div style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,0.55)",borderRadius:8,padding:"4px 6px",fontSize:14,lineHeight:1,color:"#f59e0b"}}>
               ★
             </div>
           )}
@@ -595,7 +595,7 @@ export default function App() {
 
   if (dataLoading) return <Spinner T={T}/>;
 
-  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🎲",label:"Aléatoire"},{id:"stats",icon:"📊",label:"Stats"},{id:"activity",icon:"📰",label:"Activité"}];
+  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},{id:"stats",icon:"🏆",label:"Stats"},{id:"activity",icon:"📰",label:"Activité"}];
 
   const CategoryPills=({selected=[],onChange})=>(
     <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -747,9 +747,22 @@ export default function App() {
         {computeStats.missingSlots.length>0&&<div style={{marginTop:12,background:"rgba(255,255,255,0.15)",borderRadius:10,padding:"8px 12px",fontSize:12,color:"rgba(255,255,255,0.9)"}}>💡 Il manque encore <strong>{computeStats.missingSlots.length}</strong> créneau{computeStats.missingSlots.length>1?"x":""} à planifier cette semaine</div>}
       </div>
 
-      {/* TABS */}
-      <div style={{display:"flex",background:T.navBg,borderBottom:`1px solid ${T.cardBorder}`,overflowX:"auto"}}>
-        {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,minWidth:50,padding:"10px 2px",border:"none",background:"transparent",fontFamily:"inherit",fontWeight:tab===t.id?700:400,color:tab===t.id?T.accent:T.textMuted,fontSize:10,borderBottom:`2.5px solid ${tab===t.id?T.accent:"transparent"}`,marginBottom:-1,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}><span style={{fontSize:16}}>{t.icon}</span>{t.label}</button>)}
+      {/* TABS — Style A pill */}
+      <div style={{background:T.navBg,borderBottom:`1px solid ${T.cardBorder}`,padding:"6px 8px 0"}}>
+        <div style={{display:"flex",gap:2}}>
+          {TABS.map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{
+              flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3,
+              padding:"6px 2px 8px", border:"none", cursor:"pointer", fontFamily:"inherit",
+              background: tab===t.id ? T.accentLight : "transparent",
+              borderRadius:"10px 10px 0 0",
+              transition:"background 0.15s",
+            }}>
+              <span style={{fontSize:18, filter: tab===t.id ? "none" : "grayscale(1) opacity(0.45)"}}>{t.icon}</span>
+              <span style={{fontSize:9.5, fontWeight: tab===t.id?700:500, color: tab===t.id?T.accent:T.textMuted}}>{t.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* CONTENT */}
@@ -757,18 +770,31 @@ export default function App() {
 
         {/* ══ PLATS ══ */}
         {tab==="dishes"&&<div>
-          <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="🔍 Rechercher un plat..." style={{...s.input,marginBottom:10}}/>
-
-          {/* Filtres par catégorie — boutons */}
-          <div style={{display:"flex",gap:6,marginBottom:10,overflowX:"auto",paddingBottom:4}}>
-            <button onClick={()=>setFilterFavOnly(f=>!f)} style={{...s.ghost,fontSize:12,padding:"5px 11px",whiteSpace:"nowrap",borderColor:filterFavOnly?"#f59e0b":T.inputBorder,color:filterFavOnly?"#f59e0b":T.textMuted,flexShrink:0}}>★ Favoris</button>
-            <button onClick={()=>setFilterCat("")} style={{...s.ghost,fontSize:12,padding:"5px 11px",whiteSpace:"nowrap",borderColor:filterCat===""?T.accent:T.inputBorder,color:filterCat===""?T.accent:T.textMuted,flexShrink:0}}>Tous</button>
-            {categories.map(cat=>{const active=filterCat===cat;const c=catColor(cat);return <button key={cat} onClick={()=>setFilterCat(active?"":cat)} style={{fontSize:12,padding:"5px 11px",whiteSpace:"nowrap",borderRadius:10,cursor:"pointer",border:`1.5px solid ${active?c.color:T.inputBorder}`,background:active?c.bg:"transparent",color:active?c.color:T.textMuted,flexShrink:0,fontFamily:"inherit",fontWeight:active?700:400}}>{cat}</button>;})}
+          {/* Barre loupe + ajouter */}
+          <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center"}}>
+            <button onClick={()=>setSearchQ(q=>q===null?"":null)} style={{
+              width:42,height:42,borderRadius:11,border:`1.5px solid ${searchQ!==null?T.accent:T.inputBorder}`,
+              background:searchQ!==null?T.accentLight:T.card,cursor:"pointer",fontSize:19,
+              display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+              boxShadow:`0 1px 6px ${T.shadow}`,
+            }}>🔍</button>
+            <button onClick={()=>setShowAddDish(true)} style={{...s.primary,flex:1,padding:"10px 0",textAlign:"center"}}>+ Ajouter un plat</button>
           </div>
 
-          <button onClick={()=>setShowAddDish(true)} style={{...s.primary,width:"100%",padding:12,marginBottom:14}}>+ Ajouter un plat</button>
+          {/* Barre de recherche (dépliable) */}
+          {searchQ!==null&&<div style={{marginBottom:10}}>
+            <input autoFocus value={searchQ} onChange={e=>setSearchQ(e.target.value)}
+              placeholder="Rechercher un plat..." style={{...s.input}}/>
+          </div>}
 
-          {/* Astuce swipe — hint discret */}
+          {/* Filtres en grille wrap — sans scroll */}
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+            <button onClick={()=>setFilterFavOnly(f=>!f)} style={{fontSize:12,padding:"5px 12px",borderRadius:10,cursor:"pointer",border:`1.5px solid ${filterFavOnly?"#f59e0b":T.inputBorder}`,background:filterFavOnly?"#fef3c7":"transparent",color:filterFavOnly?"#d97706":T.textMuted,fontFamily:"inherit",fontWeight:filterFavOnly?700:400}}>★ Favoris</button>
+            <button onClick={()=>setFilterCat("")} style={{fontSize:12,padding:"5px 12px",borderRadius:10,cursor:"pointer",border:`1.5px solid ${filterCat===""?T.accent:T.inputBorder}`,background:filterCat===""?T.accentLight:"transparent",color:filterCat===""?T.accent:T.textMuted,fontFamily:"inherit",fontWeight:filterCat===""?700:400}}>Tous</button>
+            {categories.map(cat=>{const active=filterCat===cat;const c=catColor(cat);return <button key={cat} onClick={()=>setFilterCat(active?"":cat)} style={{fontSize:12,padding:"5px 12px",borderRadius:10,cursor:"pointer",border:`1.5px solid ${active?c.color:T.inputBorder}`,background:active?c.bg:"transparent",color:active?c.color:T.textMuted,fontFamily:"inherit",fontWeight:active?700:400}}>{cat}</button>;})}
+          </div>
+
+          {/* Astuce swipe */}
           <div style={{fontSize:11,color:T.textLight,textAlign:"center",marginBottom:10}}>
             ← favori &nbsp;|&nbsp; appui long = noter &nbsp;|&nbsp; planifier →
           </div>
