@@ -234,8 +234,12 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
     if (touchStartX.current === null) return;
     const dx = e.touches[0].clientX - touchStartX.current;
     const dy = e.touches[0].clientY - touchStartY.current;
-    if (Math.abs(dy) > Math.abs(dx) + 10) {
+    // Si mouvement vertical détecté → annule tout (scroll normal)
+    if (Math.abs(dy) > 8) {
       clearTimeout(longPressTimer.current);
+      didSwipe.current = true; // empêche le tap au touchEnd
+      setSwipeX(0);
+      setSwipeHint(null);
       return;
     }
     clearTimeout(longPressTimer.current);
