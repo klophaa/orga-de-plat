@@ -363,7 +363,7 @@ export default function App() {
   const [selectedSlots, setSelectedSlots] = useState([]);
   const [randomResult, setRandomResult] = useState(undefined);
   const [randomFilters, setRandomFilters] = useState({category:"",minTaste:1,maxTime:5,maxDishes:5});
-  const [searchQ, setSearchQ] = useState("");
+  const [searchQ, setSearchQ] = useState(null);
   const [filterCat, setFilterCat] = useState("");
   const [filterFavOnly, setFilterFavOnly] = useState(false);
   const [historyWeek, setHistoryWeek] = useState(null);
