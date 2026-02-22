@@ -933,11 +933,11 @@ export default function App() {
         const hasPhoto=!!(d.photo||d.thumbnail);
         return (
           <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.6)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setViewDish(null)}>
-            <div style={{background:T.card,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:`0 -20px 60px ${T.shadowMd}`}} onClick={e=>e.stopPropagation()}>
+            <div style={{background:T.card,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:`0 -20px 60px ${T.shadowMd}`,overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
               {/* Photo plein écran bord à bord */}
-              <div style={{position:"relative",width:"100%",flexShrink:0,background:hasPhoto?"#111":T.headerBg,borderRadius:"24px 24px 0 0"}}>
+              <div style={{position:"relative",width:"100%",flexShrink:0,background:hasPhoto?"#111":T.headerBg}}>
                 {hasPhoto
-                  ? <img src={d.photo||d.thumbnail} alt="" style={{width:"100%",maxHeight:"60vh",objectFit:"contain",display:"block"}}/>
+                  ? <img src={d.photo||d.thumbnail} alt="" style={{width:"100%",height:260,objectFit:"cover",display:"block"}}/>
                   : <div style={{height:100,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56}}>🍽️</div>
                 }
                 {/* Dégradé bas pour lisibilité du titre */}
