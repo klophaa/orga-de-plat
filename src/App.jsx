@@ -49,6 +49,20 @@
 //
 // ── v9.2 ────────────────────────────────────────────────────────
 // + Support souris sur desktop : clic + drag sur les cartes (onMouseDown/Move/Up/Leave)
+//
+// ── v10 ─────────────────────────────────────────────────────────
+// + ① Fond dégradé animé (aurora) sur l'en-tête
+// + ② 3 palettes couleur : Océan (actuel), Coucher de soleil, Lavande — dans Outils
+// + ③ Photo fond flouté ambient dans la fiche plat
+// + ④ Micro-animations : étoile pop au tap, boutons rebond au clic
+// + ⑤ Streak hebdomadaire — affiché dans Stats
+// + ⑥ Badges à débloquer — affichés dans Stats
+// + ⑦ Roue aléatoire animée — remplace l'onglet 🪄
+// + ⑧ Confettis + toast quand planning de la semaine est complet
+// + ⑩ Minuteur de cuisson configurable — dans onglet Outils
+// + ⑮ Compatibilité des goûts Théo & Elodie — dans onglet Outils
+// + Onglet 🔧 Outils ajouté (7ème onglet)
+// + Toggle dark mode déplacé dans Outils (avec beau switch)
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -100,36 +114,55 @@ const makeEmptyWeek = () => { const p = {}; ALL_SLOTS.forEach(s => { p[s] = null
 const load = (k,d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
 const save = (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
-const lightTheme = {
-  bg:"#f0f4f8", card:"#ffffff", cardBorder:"#dde5ee",
-  text:"#1e2d3d", textMuted:"#5a7a94", textLight:"#94afc4",
-  accent:"#4f86c6", accentLight:"#e8f1fb", accentDark:"#3a6fa8",
-  green:"#6bab8a", greenLight:"#e8f5ee", teal:"#4a9ba8",
-  weekdayBg:"#eef4fb", weekdayBorder:"#b8d4ef", weekdayHeader:"#4f86c6",
-  weekendBg:"#eef7f1", weekendBorder:"#b8ddc9", weekendHeader:"#6bab8a",
-  input:"#f7fafc", inputBorder:"#ccd9e6",
-  shadow:"rgba(79,134,198,0.08)", shadowMd:"rgba(30,45,61,0.15)",
-  danger:"#e05c6a",
-  tagColors:[{bg:"#e8f1fb",color:"#3a6fa8"},{bg:"#e8f5ee",color:"#4a8a68"},{bg:"#e4f4f7",color:"#2e7a86"},{bg:"#f0eefc",color:"#6257b5"},{bg:"#fdf0e8",color:"#b0602a"},{bg:"#fbeaea",color:"#a83a3a"}],
-  navBg:"#ffffff", headerBg:"linear-gradient(135deg,#4f86c6 0%,#6bab8a 100%)",
-  activityBg:"#f4f8fc", segBg:"#e8f0f8",
-  statCard:"#eef4fb", warningBg:"#fffbeb", warningBorder:"#fcd34d",
+// ── PALETTES ─────────────────────────────────────────────────────
+const PALETTES = {
+  ocean: { name:"Océan", emoji:"🌊", a:"#4f86c6", b:"#6bab8a",
+    headerBg:"linear-gradient(135deg,#4f86c6 0%,#6bab8a 100%)",
+    darkHeaderBg:"linear-gradient(135deg,#305888 0%,#2e6e50 100%)" },
+  sunset: { name:"Coucher de soleil", emoji:"🌅", a:"#e07040", b:"#c0509a",
+    headerBg:"linear-gradient(135deg,#e07040 0%,#c0509a 100%)",
+    darkHeaderBg:"linear-gradient(135deg,#803020 0%,#702060 100%)" },
+  lavender: { name:"Lavande", emoji:"💜", a:"#8b6fd4", b:"#4ab8c8",
+    headerBg:"linear-gradient(135deg,#8b6fd4 0%,#4ab8c8 100%)",
+    darkHeaderBg:"linear-gradient(135deg,#503890 0%,#226878 100%)" },
 };
-const darkTheme = {
-  bg:"#0d1520", card:"linear-gradient(180deg,#1e2d42 0%,#192538 100%)", cardBorder:"#253a52",
-  text:"#e8f4ff", textMuted:"#7aaccc", textLight:"#4a7090",
-  accent:"#6aaee0", accentLight:"#152840", accentDark:"#5090c8",
-  green:"#6ab88a", greenLight:"#102a1c", teal:"#4aa8b8",
-  weekdayBg:"#111e30", weekdayBorder:"#1e3a5a", weekdayHeader:"#5090c8",
-  weekendBg:"#101e18", weekendBorder:"#1a3828", weekendHeader:"#5aaa78",
-  input:"#1a2a3c", inputBorder:"#253a52",
-  shadow:"rgba(0,0,0,0.4)", shadowMd:"rgba(0,0,0,0.6)",
-  danger:"#e86070",
-  tagColors:[{bg:"#152840",color:"#6aaee0"},{bg:"#102a1c",color:"#6ab88a"},{bg:"#0d2830",color:"#4aa8b8"},{bg:"#1e1840",color:"#9a8fe0"},{bg:"#2a1808",color:"#d08050"},{bg:"#280a0c",color:"#e07080"}],
-  navBg:"#1a2a3c", headerBg:"linear-gradient(135deg,#305888 0%,#2e6e50 100%)",
-  activityBg:"#111e2c", segBg:"#1a2e42",
-  statCard:"#111e30", warningBg:"#1c1600", warningBorder:"#8a6400",
-};
+
+function buildTheme(palette, dark) {
+  const p = PALETTES[palette] || PALETTES.ocean;
+  if (!dark) return {
+    bg:"#f0f4f8", card:"#ffffff", cardBorder:"#dde5ee",
+    text:"#1e2d3d", textMuted:"#5a7a94", textLight:"#94afc4",
+    accent:p.a, accentLight:`${p.a}22`, accentDark:p.a,
+    green:p.b, greenLight:`${p.b}22`, teal:"#4a9ba8",
+    weekdayBg:"#eef4fb", weekdayBorder:"#b8d4ef", weekdayHeader:p.a,
+    weekendBg:"#eef7f1", weekendBorder:"#b8ddc9", weekendHeader:p.b,
+    input:"#f7fafc", inputBorder:"#ccd9e6",
+    shadow:"rgba(79,134,198,0.08)", shadowMd:"rgba(30,45,61,0.15)",
+    danger:"#e05c6a",
+    tagColors:[{bg:`${p.a}18`,color:p.a},{bg:`${p.b}18`,color:p.b},{bg:"#e4f4f7",color:"#2e7a86"},{bg:"#f0eefc",color:"#6257b5"},{bg:"#fdf0e8",color:"#b0602a"},{bg:"#fbeaea",color:"#a83a3a"}],
+    navBg:"#ffffff", headerBg:p.headerBg,
+    activityBg:"#f4f8fc", segBg:"#e8f0f8",
+    statCard:"#eef4fb", warningBg:"#fffbeb", warningBorder:"#fcd34d",
+  };
+  return {
+    bg:"#0d1520", card:"linear-gradient(180deg,#1e2d42 0%,#192538 100%)", cardBorder:"#253a52",
+    text:"#e8f4ff", textMuted:"#7aaccc", textLight:"#4a7090",
+    accent:p.a, accentLight:"#152840", accentDark:p.a,
+    green:p.b, greenLight:"#102a1c", teal:"#4aa8b8",
+    weekdayBg:"#111e30", weekdayBorder:"#1e3a5a", weekdayHeader:p.a,
+    weekendBg:"#101e18", weekendBorder:"#1a3828", weekendHeader:p.b,
+    input:"#1a2a3c", inputBorder:"#253a52",
+    shadow:"rgba(0,0,0,0.4)", shadowMd:"rgba(0,0,0,0.6)",
+    danger:"#e86070",
+    tagColors:[{bg:"#152840",color:p.a},{bg:"#102a1c",color:p.b},{bg:"#0d2830",color:"#4aa8b8"},{bg:"#1e1840",color:"#9a8fe0"},{bg:"#2a1808",color:"#d08050"},{bg:"#280a0c",color:"#e07080"}],
+    navBg:"#1a2a3c", headerBg:p.darkHeaderBg,
+    activityBg:"#111e2c", segBg:"#1a2e42",
+    statCard:"#111e30", warningBg:"#1c1600", warningBorder:"#8a6400",
+  };
+}
+
+const lightTheme = buildTheme("ocean", false);
+const darkTheme = buildTheme("ocean", true);
 
 function StarRating({ icon, value, max=5, onChange, color, size=18 }) {
   return (
@@ -402,7 +435,8 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
 // ─── APP ─────────────────────────────────────────────────────────────────────
 export default function App() {
   const [dark, setDark] = useState(() => load("dark", false));
-  const T = dark ? darkTheme : lightTheme;
+  const [palette, setPalette] = useState(() => load("palette", "ocean"));
+  const T = buildTheme(palette, dark);
 
   const [authUser, setAuthUser] = useState(undefined);
   const [loginEmail, setLoginEmail] = useState("");
@@ -441,8 +475,26 @@ export default function App() {
   const [ratingModal, setRatingModal] = useState(null); // dish to rate
   const [confirmResetPlan, setConfirmResetPlan] = useState(false);
   const lastBackPress = useRef(0);
+  // ── Streak ──
+  const [streakCount, setStreakCount] = useState(() => load("streakCount", 0));
+  const [streakLastWeek, setStreakLastWeek] = useState(() => load("streakLastWeek", null));
+  // ── Minuteur ──
+  const [timerSeconds, setTimerSeconds] = useState(null); // null = arrêté
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerInitial, setTimerInitial] = useState(20*60);
+  const timerRef = useRef(null);
+  // ── Roue aléatoire ──
+  const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [wheelAngle, setWheelAngle] = useState(0);
+  const [wheelResult, setWheelResult] = useState(null);
+  const wheelRef = useRef(null);
+  // ── Confettis ──
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => { save("dark", dark); }, [dark]);
+  useEffect(() => { save("palette", palette); }, [palette]);
+  useEffect(() => { save("streakCount", streakCount); }, [streakCount]);
+  useEffect(() => { save("streakLastWeek", streakLastWeek); }, [streakLastWeek]);
 
   // ── Bloquer scroll body quand viewDish ouvert ──
   useEffect(() => {
@@ -461,6 +513,72 @@ export default function App() {
       document.body.style.width = "";
     };
   }, [viewDish]);
+
+  // ── Streak : vérifier si semaine complète ──
+  useEffect(() => {
+    const currentWeek = getWeekKey();
+    const currentPlan = weekPlans[currentWeek] || {};
+    const filled = Object.values(currentPlan).filter(Boolean).length;
+    const total = ALL_SLOTS.length;
+    if (filled === total && filled > 0) {
+      // Semaine complète !
+      if (streakLastWeek !== currentWeek) {
+        const prevWeekDate = new Date();
+        prevWeekDate.setDate(prevWeekDate.getDate() - 7);
+        const prevWeek = getWeekKey(prevWeekDate);
+        const newStreak = streakLastWeek === prevWeek ? streakCount + 1 : 1;
+        setStreakCount(newStreak);
+        setStreakLastWeek(currentWeek);
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 4000);
+      }
+    }
+  }, [weekPlans]);
+
+  // ── Timer ──
+  useEffect(() => {
+    if (timerRunning && timerSeconds > 0) {
+      timerRef.current = setInterval(() => {
+        setTimerSeconds(s => {
+          if (s <= 1) { clearInterval(timerRef.current); setTimerRunning(false); return 0; }
+          return s - 1;
+        });
+      }, 1000);
+    } else {
+      clearInterval(timerRef.current);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [timerRunning]);
+
+  const startTimer = (mins) => {
+    const secs = mins * 60;
+    setTimerInitial(secs);
+    setTimerSeconds(secs);
+    setTimerRunning(true);
+  };
+  const formatTimer = (s) => {
+    if (s === null) return "--:--";
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  };
+
+  // ── Roue aléatoire ──
+  const spinWheel = (wheelDishes) => {
+    if (wheelSpinning || wheelDishes.length === 0) return;
+    setWheelSpinning(true);
+    setWheelResult(null);
+    const spins = 5 + Math.random() * 5; // 5-10 tours
+    const resultIdx = Math.floor(Math.random() * wheelDishes.length);
+    const segAngle = 360 / wheelDishes.length;
+    // L'angle final pointe sur le résultat (pointeur en haut = 0°)
+    const targetAngle = wheelAngle + spins * 360 + (360 - resultIdx * segAngle - segAngle / 2);
+    setWheelAngle(targetAngle);
+    setTimeout(() => {
+      setWheelSpinning(false);
+      setWheelResult(wheelDishes[resultIdx]);
+    }, 4000);
+  };
 
   // ── Android back button ──
   useEffect(() => {
@@ -679,7 +797,7 @@ export default function App() {
 
   if (dataLoading) return <Spinner T={T}/>;
 
-  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},{id:"stats",icon:"🏆",label:"Stats"},{id:"activity",icon:"📰",label:"Activité"}];
+  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},{id:"stats",icon:"🏆",label:"Stats"},{id:"activity",icon:"📰",label:"Activité"},{id:"tools",icon:"🔧",label:"Outils"}];
 
   const CategoryPills=({selected=[],onChange})=>(
     <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -817,7 +935,15 @@ export default function App() {
   return (
     <div style={s.app}>
       {/* HEADER COMPACT + TABS INTÉGRÉS */}
-      <div style={{background:T.headerBg}}>
+      <style>{`
+        @keyframes aurora{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+        .aurora-hdr{background-size:300% 300%!important;animation:aurora 10s ease infinite}
+        @keyframes starPop{0%{transform:scale(1)}40%{transform:scale(1.5)}70%{transform:scale(0.9)}100%{transform:scale(1)}}
+        @keyframes btnPress{0%{transform:scale(1)}40%{transform:scale(0.93)}100%{transform:scale(1)}}
+        .star-anim{animation:starPop 0.35s ease}
+        .btn-anim:active{animation:btnPress 0.2s ease}
+      `}</style>
+      <div className="aurora-hdr" style={{background:T.headerBg}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px 6px"}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <span style={{fontSize:22}}>🥗</span>
@@ -956,42 +1082,122 @@ export default function App() {
           </div>
         </div>}
 
-        {/* ══ ALÉATOIRE ══ */}
-        {tab==="random"&&<div>
-          <div style={{...s.card,marginBottom:14}}>
-            <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:16}}>🎲 Tirer un plat au hasard</div>
-            <div style={{display:"flex",flexDirection:"column",gap:12}}>
-              <div><label style={s.label}>Catégorie</label><select value={randomFilters.category} onChange={e=>setRandomFilters(f=>({...f,category:e.target.value}))} style={s.input}><option value="">Toutes</option>{categories.map(c=><option key={c}>{c}</option>)}</select></div>
-              <div><label style={s.label}>★ Goût minimum : {randomFilters.minTaste}/5</label><input type="range" min={1} max={5} value={randomFilters.minTaste} onChange={e=>setRandomFilters(f=>({...f,minTaste:+e.target.value}))} style={{width:"100%",accentColor:T.accent}}/></div>
-              <div><label style={s.label}>⏱️ Temps max : {randomFilters.maxTime}/5</label><input type="range" min={1} max={5} value={randomFilters.maxTime} onChange={e=>setRandomFilters(f=>({...f,maxTime:+e.target.value}))} style={{width:"100%",accentColor:T.green}}/></div>
-              <div><label style={s.label}>🍽️ Vaisselle max : {randomFilters.maxDishes}/5</label><input type="range" min={1} max={5} value={randomFilters.maxDishes} onChange={e=>setRandomFilters(f=>({...f,maxDishes:+e.target.value}))} style={{width:"100%",accentColor:T.teal}}/></div>
-              <button onClick={drawRandom} style={{...s.primary,padding:13,fontSize:15}}>🎲 Tirer un plat !</button>
-            </div>
-          </div>
-          {randomResult===null&&<div style={{textAlign:"center",color:T.textLight,fontSize:14,padding:16}}>Aucun plat ne correspond aux filtres 😅</div>}
-          {randomResult&&<div>
-            <div style={{textAlign:"center",fontWeight:700,color:T.accent,marginBottom:10}}>✨ Et ce soir...</div>
-            <div style={{...s.card,display:"flex",gap:12,alignItems:"center"}}>
-              <div style={{width:60,height:60,borderRadius:12,background:T.accentLight,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>
-                {(randomResult.thumbnail||randomResult.photo)?<img src={randomResult.thumbnail||randomResult.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+        {/* ══ ALÉATOIRE — ROUE ══ */}
+        {tab==="random"&&(()=>{
+          const wheelDishes=dishes.filter(d=>{
+            const avg=avgTaste(d);
+            if(randomFilters.category&&!(d.categories||[]).includes(randomFilters.category))return false;
+            if(avg>0&&avg<randomFilters.minTaste)return false;
+            if((d.timeRating||0)>randomFilters.maxTime&&d.timeRating>0)return false;
+            if((d.dishesRating||0)>randomFilters.maxDishes&&d.dishesRating>0)return false;
+            return true;
+          }).slice(0,8);
+          const segCount=wheelDishes.length||1;
+          const segAngle=360/segCount;
+          const SEG_COLORS=[T.accent,T.green,"#9b7fd4","#e07040","#4aa8b8","#d97706","#e05c6a","#5a9e78"];
+          return <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {/* Filtres */}
+            <div style={{...s.card}}>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <div><label style={s.label}>Catégorie</label><select value={randomFilters.category} onChange={e=>setRandomFilters(f=>({...f,category:e.target.value}))} style={s.input}><option value="">Toutes</option>{categories.map(c=><option key={c}>{c}</option>)}</select></div>
+                <div><label style={s.label}>★ Goût minimum : {randomFilters.minTaste}/5</label><input type="range" min={1} max={5} value={randomFilters.minTaste} onChange={e=>setRandomFilters(f=>({...f,minTaste:+e.target.value}))} style={{width:"100%",accentColor:T.accent}}/></div>
+                <div><label style={s.label}>⏱️ Temps max : {randomFilters.maxTime}/5</label><input type="range" min={1} max={5} value={randomFilters.maxTime} onChange={e=>setRandomFilters(f=>({...f,maxTime:+e.target.value}))} style={{width:"100%",accentColor:T.green}}/></div>
+                <div><label style={s.label}>🫧 Vaisselle max : {randomFilters.maxDishes}/5</label><input type="range" min={1} max={5} value={randomFilters.maxDishes} onChange={e=>setRandomFilters(f=>({...f,maxDishes:+e.target.value}))} style={{width:"100%",accentColor:T.teal}}/></div>
               </div>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:700,fontSize:16,color:T.text}}>{randomResult.name}</div>
-                <div style={{display:"flex",gap:8,marginTop:4}}>
-                  <StarRating icon="★" value={Math.round(avgTaste(randomResult))} max={5} color="#f59e0b" size={14}/>
+            </div>
+            {wheelDishes.length===0&&<div style={{textAlign:"center",color:T.textLight,fontSize:14,padding:24}}>Aucun plat ne correspond aux filtres 😅</div>}
+            {wheelDishes.length>0&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+              {/* Pointeur + Roue */}
+              <div style={{position:"relative",display:"flex",justifyContent:"center",width:"100%"}}>
+                <div style={{position:"absolute",top:-12,zIndex:10,fontSize:24,color:T.accent,filter:"drop-shadow(0 2px 4px rgba(0,0,0,0.25))"}}>▼</div>
+                <svg width="260" height="260" viewBox="-130 -130 260 260"
+                  style={{transform:`rotate(${wheelAngle}deg)`,
+                    transition:wheelSpinning?"transform 4s cubic-bezier(0.17,0.67,0.12,1)":"none",
+                    filter:"drop-shadow(0 8px 24px rgba(0,0,0,0.18))"}}>
+                  {wheelDishes.map((dish,i)=>{
+                    const sa=(i*segAngle-90)*Math.PI/180;
+                    const ea=((i+1)*segAngle-90)*Math.PI/180;
+                    const r=120,x1=r*Math.cos(sa),y1=r*Math.sin(sa),x2=r*Math.cos(ea),y2=r*Math.sin(ea);
+                    const large=segAngle>180?1:0;
+                    const ma=((i+0.5)*segAngle-90)*Math.PI/180;
+                    const tx=72*Math.cos(ma),ty=72*Math.sin(ma);
+                    const nm=dish.name.length>9?dish.name.slice(0,8)+"…":dish.name;
+                    return <g key={dish.id}>
+                      <path d={`M0,0 L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`} fill={SEG_COLORS[i%SEG_COLORS.length]} stroke="white" strokeWidth="2.5"/>
+                      <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle"
+                        fontSize={segCount>6?9:11} fontWeight="700" fill="white"
+                        transform={`rotate(${(i+0.5)*segAngle},${tx},${ty})`}>{nm}</text>
+                    </g>;
+                  })}
+                  <circle cx="0" cy="0" r="20" fill="white" stroke={T.accent} strokeWidth="3"/>
+                  <text x="0" y="6" textAnchor="middle" fontSize="15">🪄</text>
+                </svg>
+              </div>
+              <button onClick={()=>spinWheel(wheelDishes)} disabled={wheelSpinning} className="btn-anim"
+                style={{...s.primary,padding:"14px 40px",fontSize:16,fontWeight:800,
+                  opacity:wheelSpinning?0.6:1,
+                  background:`linear-gradient(135deg,${T.accent},${T.green})`}}>
+                {wheelSpinning?"🌀 En train de tourner…":"🎰 Tourner la roue !"}
+              </button>
+              {wheelResult&&!wheelSpinning&&<div style={{...s.card,width:"100%",border:`2px solid ${T.accent}`}}>
+                <div style={{textAlign:"center",fontWeight:800,fontSize:13,color:T.accent,marginBottom:10}}>✨ Ce soir c'est...</div>
+                <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                  <div style={{width:56,height:56,borderRadius:12,background:T.accentLight,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>
+                    {(wheelResult.thumbnail||wheelResult.photo)?<img src={wheelResult.thumbnail||wheelResult.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:800,fontSize:16,color:T.text}}>{wheelResult.name}</div>
+                    <StarRating icon="★" value={Math.round(avgTaste(wheelResult))} max={5} color="#f59e0b" size={14}/>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div style={{display:"flex",gap:8,marginTop:10}}>
-              <button onClick={drawRandom} style={{...s.ghost,flex:1}}>🔄 Retirer</button>
-              <button onClick={()=>{setPendingDishForPlan(randomResult);setPlanSlot("__pick__");setSelectedSlots([]);}} style={{...s.primary,flex:1}}>📅 Planifier</button>
-            </div>
-          </div>}
-        </div>}
+                <div style={{display:"flex",gap:8,marginTop:12}}>
+                  <button onClick={()=>{setWheelResult(null);spinWheel(wheelDishes);}} style={{...s.ghost,flex:1}}>🔄 Retourner</button>
+                  <button className="btn-anim" onClick={()=>{setPendingDishForPlan(wheelResult);setPlanSlot("__pick__");setSelectedSlots([]);}} style={{...s.primary,flex:1}}>📅 Planifier</button>
+                </div>
+              </div>}
+            </div>}
+          </div>;
+        })()}
 
         {/* ══ STATS ══ */}
         {tab==="stats"&&<div>
           <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:16}}>📊 Statistiques</div>
+          {/* STREAK */}
+          {streakCount>0&&<div style={{...s.card,marginBottom:14,background:"linear-gradient(135deg,#fff7ed,#fef3c7)",border:"1.5px solid #fcd34d"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{fontSize:38}}>🔥</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:20,fontWeight:800,color:"#d97706"}}>{streakCount} semaine{streakCount>1?"s":""} de suite !</div>
+                <div style={{fontSize:12,color:"#92400e",marginTop:2}}>Planning complet 🎉</div>
+              </div>
+            </div>
+          </div>}
+          {/* BADGES */}
+          {(()=>{
+            const totalPlanned=computeStats.totalPlanned;
+            const ideasTested=ideas.filter(i=>i.tested).length;
+            const favCount=dishes.filter(d=>d.favorite).length;
+            const BADGES=[
+              {id:"cook",icon:"🏅",label:"Cuisinier du mois",desc:"20 repas planifiés",unlocked:totalPlanned>=20},
+              {id:"adv",icon:"🌟",label:"Aventurier",desc:"5 idées testées",unlocked:ideasTested>=5},
+              {id:"fire",icon:"🔥",label:"En feu",desc:"10 semaines de suite",unlocked:streakCount>=10},
+              {id:"gourmet",icon:"⭐",label:"Gourmet",desc:"10 favoris",unlocked:favCount>=10},
+              {id:"balance",icon:"🌈",label:"Équilibré",desc:"50 repas planifiés",unlocked:totalPlanned>=50},
+              {id:"legend",icon:"💎",label:"Légende",desc:"50 plats enregistrés",unlocked:dishes.length>=50},
+            ];
+            const unlocked=BADGES.filter(b=>b.unlocked);
+            const locked=BADGES.filter(b=>!b.unlocked);
+            return <div style={{...s.card,marginBottom:14}}>
+              <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🏆 Badges</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                {[...unlocked,...locked].map(b=><div key={b.id} style={{textAlign:"center",padding:"10px 6px",borderRadius:12,background:b.unlocked?T.accentLight:T.bg,border:`1.5px solid ${b.unlocked?T.accent:T.cardBorder}`,opacity:b.unlocked?1:0.45}}>
+                  <div style={{fontSize:26,filter:b.unlocked?"none":"grayscale(1)"}}>{b.icon}</div>
+                  <div style={{fontSize:9,fontWeight:700,color:T.text,marginTop:4,lineHeight:1.3}}>{b.label}</div>
+                  <div style={{fontSize:8,color:T.textMuted,marginTop:2}}>{b.desc}</div>
+                </div>)}
+              </div>
+            </div>;
+          })()}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
             {[{label:"Plats enregistrés",value:dishes.length,icon:"🍽️"},{label:"Repas planifiés",value:computeStats.totalPlanned,icon:"📅"},{label:"Idées en attente",value:ideas.filter(i=>!i.tested).length,icon:"💡"},{label:"Favoris",value:dishes.filter(d=>d.favorite).length,icon:"★"}].map(({label,value,icon})=><div key={label} style={{...s.card,background:T.statCard,textAlign:"center",padding:"14px 10px"}}><div style={{fontSize:24,marginBottom:4}}>{icon}</div><div style={{fontSize:22,fontWeight:800,color:T.accent}}>{value}</div><div style={{fontSize:11,color:T.textMuted,marginTop:2}}>{label}</div></div>)}
           </div>
@@ -1010,7 +1216,160 @@ export default function App() {
             {activityFeed.map(a=><div key={a.id} style={{...s.card,display:"flex",gap:10,alignItems:"center"}}><Avatar user={a.user} size={34}/><div style={{flex:1}}><div style={{fontSize:13,color:T.text}}><strong style={{color:Object.values(ALLOWED_EMAILS).find(u=>u.displayName===a.user)?.color}}>{a.user}</strong> {a.msg}</div><div style={{fontSize:11,color:T.textLight,marginTop:2}}>{formatTimeAgo(a.ts)}</div></div></div>)}
           </div>
         </div>}
+
+        {/* ══ OUTILS ══ */}
+        {tab==="tools"&&<div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:4}}>🔧 Outils & Réglages</div>
+
+          {/* ── THÈMES ── */}
+          <div style={{...s.card}}>
+            <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>🎨 Thème couleur</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {Object.entries(PALETTES).map(([key,p])=>(
+                <button key={key} onClick={()=>setPalette(key)} style={{
+                  display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:12,
+                  border:`2px solid ${palette===key?T.accent:T.cardBorder}`,
+                  background:palette===key?T.accentLight:T.bg,
+                  cursor:"pointer",fontFamily:"inherit",textAlign:"left"
+                }}>
+                  <div style={{width:36,height:36,borderRadius:10,background:p.headerBg,flexShrink:0}}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{p.emoji} {p.name}</div>
+                  </div>
+                  {palette===key&&<div style={{fontSize:16,color:T.accent}}>✓</div>}
+                </button>
+              ))}
+            </div>
+            <div style={{marginTop:12,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:12,background:T.bg,border:`1.5px solid ${T.cardBorder}`}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:T.text}}>🌙 Mode sombre</div>
+                <div style={{fontSize:11,color:T.textMuted}}>Interface sombre</div>
+              </div>
+              <button onClick={()=>setDark(d=>!d)} style={{
+                width:46,height:26,borderRadius:13,border:"none",cursor:"pointer",position:"relative",
+                background:dark?"#4f86c6":"#ccd9e6",transition:"background 0.2s"
+              }}>
+                <div style={{
+                  position:"absolute",top:3,left:dark?22:3,width:20,height:20,borderRadius:10,
+                  background:"white",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"
+                }}/>
+              </button>
+            </div>
+          </div>
+
+          {/* ── MINUTEUR ── */}
+          <div style={{...s.card}}>
+            <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>⏱️ Minuteur de cuisson</div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:52,fontWeight:800,color:timerSeconds===0?"#e05c6a":T.accent,fontVariantNumeric:"tabular-nums",letterSpacing:2,marginBottom:8}}>
+                {timerSeconds===null ? formatTimer(timerInitial) : formatTimer(timerSeconds)}
+              </div>
+              {timerSeconds!==null&&timerSeconds!==timerInitial&&<div style={{width:"100%",height:8,background:T.cardBorder,borderRadius:4,overflow:"hidden",marginBottom:14}}>
+                <div style={{width:`${(timerSeconds/timerInitial)*100}%`,height:"100%",background:`linear-gradient(90deg,${T.accent},${T.green})`,borderRadius:4,transition:"width 1s linear"}}/>
+              </div>}
+              <div style={{display:"flex",gap:8,marginBottom:12,justifyContent:"center",flexWrap:"wrap"}}>
+                {[5,10,15,20,30,45].map(m=>(
+                  <button key={m} onClick={()=>startTimer(m)} style={{
+                    padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",
+                    border:`1.5px solid ${timerInitial===m*60?T.accent:T.inputBorder}`,
+                    background:timerInitial===m*60?T.accentLight:"transparent",
+                    color:timerInitial===m*60?T.accent:T.textMuted,fontFamily:"inherit"
+                  }}>{m}min</button>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>{setTimerSeconds(timerInitial);setTimerRunning(false);}} style={{...s.ghost,flex:1,fontSize:18}}>↺</button>
+                <button onClick={()=>setTimerRunning(r=>!r)} disabled={timerSeconds===null||timerSeconds===0} className="btn-anim" style={{
+                  ...s.primary,flex:2,fontSize:15,
+                  opacity:(timerSeconds===null||timerSeconds===0)?0.5:1
+                }}>
+                  {timerRunning?"⏸ Pause":"▶ Démarrer"}
+                </button>
+              </div>
+              {timerSeconds===0&&<div style={{marginTop:12,padding:"10px",background:"#fbeaea",borderRadius:10,color:"#e05c6a",fontWeight:700,fontSize:13}}>🔔 C'est prêt !</div>}
+            </div>
+          </div>
+
+          {/* ── COMPATIBILITÉ GOÛTS ── */}
+          {(()=>{
+            const users=Object.values(ALLOWED_EMAILS).map(u=>u.displayName);
+            const commonDishes=dishes.filter(d=>{
+              const ratings=users.map(u=>d.tasteByUser?.[u]).filter(v=>v!=null&&v>0);
+              return ratings.length>=2;
+            });
+            if(commonDishes.length<3) return <div style={{...s.card}}>
+              <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:6}}>💑 Compatibilité des goûts</div>
+              <div style={{fontSize:12,color:T.textMuted}}>Notez au moins 3 plats en commun pour voir votre score de compatibilité !</div>
+            </div>;
+            const diffs=commonDishes.map(d=>{
+              const r=users.map(u=>d.tasteByUser?.[u]||0);
+              return {dish:d,diff:Math.abs(r[0]-r[1]),avg:(r[0]+r[1])/2};
+            });
+            const compat=Math.round(100-((diffs.reduce((a,x)=>a+x.diff,0)/diffs.length)/4)*100);
+            const agree=diffs.filter(x=>x.diff<=1).sort((a,b)=>b.avg-a.avg).slice(0,3);
+            const disagree=diffs.filter(x=>x.diff>=2).sort((a,b)=>b.diff-a.diff).slice(0,3);
+            return <div style={{...s.card}}>
+              <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:14}}>💑 Compatibilité des goûts</div>
+              <div style={{textAlign:"center",marginBottom:14}}>
+                <div style={{fontSize:44,fontWeight:800,background:`linear-gradient(135deg,${T.accent},${T.green})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{compat}%</div>
+                <div style={{fontSize:12,color:T.textMuted}}>{compat>=80?"Vous avez des goûts très proches 💚":compat>=60?"Quelques différences, mais ça se complète 👍":"Vos goûts divergent souvent 🤔"}</div>
+                <div style={{width:"100%",height:8,background:T.cardBorder,borderRadius:4,overflow:"hidden",marginTop:8}}>
+                  <div style={{width:`${compat}%`,height:"100%",background:`linear-gradient(90deg,${T.accent},${T.green})`,borderRadius:4}}/>
+                </div>
+                <div style={{fontSize:11,color:T.textLight,marginTop:4}}>Sur {commonDishes.length} plats notés par les deux</div>
+              </div>
+              {agree.length>0&&<div style={{marginBottom:10}}>
+                <div style={{fontSize:10,fontWeight:800,color:T.green,textTransform:"uppercase",letterSpacing:0.8,marginBottom:6}}>💚 En accord</div>
+                {agree.map(({dish})=><div key={dish.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <div style={{width:28,height:28,borderRadius:7,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,overflow:"hidden",flexShrink:0}}>{(dish.thumbnail||dish.photo)?<img src={dish.thumbnail||dish.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}</div>
+                  <div style={{fontSize:12,color:T.text,flex:1}}>{dish.name}</div>
+                  <div style={{fontSize:11,color:T.textMuted}}>{users.map(u=>`${dish.tasteByUser?.[u]||0}`).join(" / ")}</div>
+                </div>)}
+              </div>}
+              {disagree.length>0&&<div>
+                <div style={{fontSize:10,fontWeight:800,color:"#e05c6a",textTransform:"uppercase",letterSpacing:0.8,marginBottom:6}}>🤔 Désaccords</div>
+                {disagree.map(({dish})=><div key={dish.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <div style={{width:28,height:28,borderRadius:7,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,overflow:"hidden",flexShrink:0}}>{(dish.thumbnail||dish.photo)?<img src={dish.thumbnail||dish.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}</div>
+                  <div style={{fontSize:12,color:T.text,flex:1}}>{dish.name}</div>
+                  <div style={{fontSize:11,color:T.textMuted}}>{users.map(u=>`${dish.tasteByUser?.[u]||0}`).join(" / ")}</div>
+                </div>)}
+              </div>}
+            </div>;
+          })()}
+        </div>}
       </div>
+
+      {/* ══ CONFETTIS ══ */}
+      {showConfetti&&<div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:9999,overflow:"hidden"}}>
+        <style>{`
+          @keyframes confettiFall{
+            0%{transform:translateY(-30px) rotate(0deg) scale(1);opacity:1}
+            80%{opacity:1}
+            100%{transform:translateY(110vh) rotate(720deg) scale(0.7);opacity:0}
+          }
+        `}</style>
+        {Array.from({length:30}).map((_,i)=>{
+          const colors=["#f59e0b","#4f86c6","#6bab8a","#e05c6a","#9b7fd4","#4aa8b8"];
+          const color=colors[i%colors.length];
+          const left=Math.random()*100;
+          const delay=Math.random()*1.5;
+          const dur=2+Math.random()*2;
+          const size=6+Math.random()*10;
+          return <div key={i} style={{
+            position:"absolute",top:-20,left:`${left}%`,
+            width:size,height:size,
+            background:color,
+            borderRadius:Math.random()>0.5?"50%":"2px",
+            animation:`confettiFall ${dur}s ease ${delay}s both`
+          }}/>;
+        })}
+        <div style={{position:"absolute",top:"30%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center",
+          background:"white",borderRadius:20,padding:"20px 32px",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}>
+          <div style={{fontSize:44,marginBottom:6}}>🎉</div>
+          <div style={{fontSize:18,fontWeight:800,color:"#1e2d3d"}}>Semaine complète !</div>
+          {streakCount>1&&<div style={{fontSize:13,color:"#d97706",fontWeight:700,marginTop:6}}>🔥 {streakCount} semaines de suite !</div>}
+        </div>
+      </div>}
 
       {/* ══ MODALS ══ */}
 
@@ -1026,10 +1385,12 @@ export default function App() {
         return (
           <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.6)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setViewDish(null)}>
             <div style={{background:T.card,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",overscrollBehavior:"contain",WebkitOverflowScrolling:"touch",boxShadow:`0 -20px 60px ${T.shadowMd}`}} onClick={e=>e.stopPropagation()}>
-              {/* Photo plein écran bord à bord */}
-              <div style={{position:"relative",width:"100%",flexShrink:0,background:hasPhoto?"#111":T.headerBg}}>
+              {/* Photo plein écran bord à bord + fond flouté */}
+              <div style={{position:"relative",width:"100%",flexShrink:0,background:hasPhoto?"#111":T.headerBg,overflow:"hidden"}}>
+                {/* Fond flouté ambient */}
+                {hasPhoto&&<img src={d.photo||d.thumbnail} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",filter:"blur(24px) brightness(0.5)",transform:"scale(1.15)",zIndex:0}}/>}
                 {hasPhoto
-                  ? <img src={d.photo||d.thumbnail} alt="" style={{width:"100%",display:"block"}}/>
+                  ? <img src={d.photo||d.thumbnail} alt="" style={{width:"100%",display:"block",position:"relative",zIndex:1}}/>
                   : <div style={{height:100,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56}}>🍽️</div>
                 }
                 {/* Dégradé bas pour lisibilité du titre */}
@@ -1062,7 +1423,7 @@ export default function App() {
                 <div style={{fontSize:11,color:T.textLight,display:"flex",alignItems:"center",gap:5}}><Avatar user={d.updatedBy} size={14}/>Modifié par <strong>{d.updatedBy}</strong> · {formatTimeAgo(d.updatedAt)}</div>
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={()=>{setEditDish(d);setViewDish(null);}} style={{...s.ghost,flex:1}}>✏️ Modifier</button>
-                  <button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setViewDish(null);}} style={{...s.primary,flex:1}}>📅 Planifier</button>
+                  <button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setViewDish(null);}} className="btn-anim" style={{...s.primary,flex:1}}>📅 Planifier</button>
                 </div>
                 <button onClick={()=>{deleteDish(d.id,d.name);setViewDish(null);}} style={{...s.ghost,width:"100%",color:T.danger,borderColor:T.danger}}>🗑️ Supprimer ce plat</button>
               </div>
