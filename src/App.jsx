@@ -1,4 +1,8 @@
-// ORGA DE PLAT — v6
+// ╔══════════════════════════════════════════════════════════════╗
+// ║                    ORGA DE PLAT                              ║
+// ╚══════════════════════════════════════════════════════════════╝
+//
+// ── v6 ──────────────────────────────────────────────────────────
 // + Grille 2 colonnes avec grandes miniatures
 // + Note de goût en haut gauche, favori en haut droit de la miniature
 // + Swipe droit = planifier, swipe gauche = toggle favori
@@ -7,6 +11,41 @@
 // + Suppression filtre note de goût
 // + Bouton remise à zéro du planning
 // + Bouton retour Android : revient à la page précédente, double tap = quitter
+//
+// ── v7 ──────────────────────────────────────────────────────────
+// + Nouveaux emojis onglets : 🥘 📅 💡 🪄 🏆 📰
+// + Style A onglets : pill actif avec fond coloré dans le bandeau
+// + Catégories sans scroll horizontal (flexWrap)
+// + Loupe cliquable : barre de recherche masquée par défaut
+// + Étoile favori en doré sur la miniature
+//
+// ── v7.1 ────────────────────────────────────────────────────────
+// + Barre de recherche masquée par défaut (searchQ initialisé à null)
+//
+// ── v8 ──────────────────────────────────────────────────────────
+// + En-tête compact : onglets intégrés dans le bandeau coloré
+// + Cartes modernisées : sans bordure, ombres douces, coins arrondis 18px
+// + Fiche plat : photo plein écran bord à bord avec titre en overlay
+// + Dégradé sur photo + bouton fermer avec backdrop-filter
+//
+// ── v8.1 ────────────────────────────────────────────────────────
+// + Photo fiche : objectFit contain → photo entière sans rognage
+// + overflow:hidden sur la modale pour coins arrondis propres
+//
+// ── v8.2 ────────────────────────────────────────────────────────
+// + Photo fiche : width 100% sans hauteur fixe → photo entière bord à bord
+//
+// ── v9 ──────────────────────────────────────────────────────────
+// + Animation cascade au chargement des cartes (délai 60ms entre chaque)
+// + Swipe feedback progressif : icône grossit selon la distance du swipe
+// + Dark mode affiné : fond bleuté, cartes avec dégradé, texte plus lumineux
+// + Icône vaisselle : 🍽️ → 🫧 (bulles de savon)
+// + Bug scroll modale corrigé : l'arrière-plan reste figé à l'ouverture d'une fiche
+// + Historique des versions ajouté en commentaire
+//
+// ── v9.1 ────────────────────────────────────────────────────────
+// + Swipe plus facile : seuil réduit 60px → 40px
+// + Détection du flick (geste rapide court) pour déclencher le swipe sans distance complète
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -32,7 +71,7 @@ const DEFAULT_CATEGORIES = ["Fat","Pas trop fat","Diet","Asiat","Finger food","D
 const WEEKDAY_SLOTS = ["Lundi midi","Lundi soir","Mardi midi","Mardi soir","Mercredi midi","Mercredi soir","Jeudi midi","Jeudi soir","Vendredi midi"];
 const WEEKEND_SLOTS = ["Vendredi soir","Samedi midi","Samedi soir","Dimanche midi","Dimanche soir"];
 const ALL_SLOTS = [...WEEKDAY_SLOTS, ...WEEKEND_SLOTS];
-const SWIPE_THRESHOLD = 60; // px
+const SWIPE_THRESHOLD = 40; // px — seuil réduit pour swipe plus facile
 const LONG_PRESS_MS = 500;
 
 function getWeekKey(d = new Date()) {
@@ -209,6 +248,7 @@ function LinksEditor({ links=[], onChange, T, s }) {
 function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, catColor }) {
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
+  const touchStartTime = useRef(null);
   const [swipeX, setSwipeX] = useState(0);
   const [swipeHint, setSwipeHint] = useState(null); // 'right' | 'left' | null
   const longPressTimer = useRef(null);
@@ -222,6 +262,7 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
   const onTouchStart = e => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
+    touchStartTime.current = Date.now();
     didSwipe.current = false;
     didLongPress.current = false;
     longPressTimer.current = setTimeout(() => {
@@ -253,10 +294,13 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
   const onTouchEnd = e => {
     clearTimeout(longPressTimer.current);
     const dx = swipeX;
+    const dt = Date.now() - (touchStartTime.current || Date.now());
+    const velocity = Math.abs(dx) / Math.max(dt, 1); // px/ms
+    const isFlick = velocity > 0.3 && Math.abs(dx) > 15; // flick rapide même court
     setSwipeX(0);
     setSwipeHint(null);
     if (didLongPress.current) return;
-    if (Math.abs(dx) >= SWIPE_THRESHOLD) {
+    if (Math.abs(dx) >= SWIPE_THRESHOLD || isFlick) {
       if (dx > 0) onSwipeRight(dish);
       else onSwipeLeft(dish);
     } else if (!didSwipe.current) {
