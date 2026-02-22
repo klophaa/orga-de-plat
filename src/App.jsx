@@ -937,7 +937,7 @@ export default function App() {
               {/* Photo plein écran bord à bord */}
               <div style={{position:"relative",width:"100%",flexShrink:0,background:hasPhoto?"#111":T.headerBg}}>
                 {hasPhoto
-                  ? <img src={d.photo||d.thumbnail} alt="" style={{width:"100%",height:260,objectFit:"cover",display:"block"}}/>
+                  ? <img src={d.photo||d.thumbnail} alt="" style={{width:"100%",display:"block"}}/>
                   : <div style={{height:100,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56}}>🍽️</div>
                 }
                 {/* Dégradé bas pour lisibilité du titre */}
