@@ -74,19 +74,19 @@ const lightTheme = {
   statCard:"#eef4fb", warningBg:"#fffbeb", warningBorder:"#fcd34d",
 };
 const darkTheme = {
-  bg:"#0e1621", card:"#162030", cardBorder:"#1e3045",
-  text:"#d4e4f4", textMuted:"#6a90b0", textLight:"#3d5f78",
-  accent:"#5b9ad6", accentLight:"#112035", accentDark:"#4a80bb",
-  green:"#5a9e78", greenLight:"#0f2318", teal:"#3d8e9a",
-  weekdayBg:"#101e30", weekdayBorder:"#1e3a5a", weekdayHeader:"#3a6fa8",
-  weekendBg:"#0f1e16", weekendBorder:"#1a3828", weekendHeader:"#4a8a68",
-  input:"#162030", inputBorder:"#1e3045",
-  shadow:"rgba(0,0,0,0.3)", shadowMd:"rgba(0,0,0,0.5)",
-  danger:"#e05c6a",
-  tagColors:[{bg:"#112035",color:"#5b9ad6"},{bg:"#0f2318",color:"#5a9e78"},{bg:"#0d2028",color:"#3d8e9a"},{bg:"#1a1535",color:"#8a7fd4"},{bg:"#251408",color:"#c07040"},{bg:"#25080a",color:"#d06070"}],
-  navBg:"#162030", headerBg:"linear-gradient(135deg,#2a4f7a 0%,#2d6b4a 100%)",
-  activityBg:"#101e2c", segBg:"#1a2e40",
-  statCard:"#0d1e30", warningBg:"#1a1500", warningBorder:"#7a5800",
+  bg:"#0d1520", card:"linear-gradient(180deg,#1e2d42 0%,#192538 100%)", cardBorder:"#253a52",
+  text:"#e8f4ff", textMuted:"#7aaccc", textLight:"#4a7090",
+  accent:"#6aaee0", accentLight:"#152840", accentDark:"#5090c8",
+  green:"#6ab88a", greenLight:"#102a1c", teal:"#4aa8b8",
+  weekdayBg:"#111e30", weekdayBorder:"#1e3a5a", weekdayHeader:"#5090c8",
+  weekendBg:"#101e18", weekendBorder:"#1a3828", weekendHeader:"#5aaa78",
+  input:"#1a2a3c", inputBorder:"#253a52",
+  shadow:"rgba(0,0,0,0.4)", shadowMd:"rgba(0,0,0,0.6)",
+  danger:"#e86070",
+  tagColors:[{bg:"#152840",color:"#6aaee0"},{bg:"#102a1c",color:"#6ab88a"},{bg:"#0d2830",color:"#4aa8b8"},{bg:"#1e1840",color:"#9a8fe0"},{bg:"#2a1808",color:"#d08050"},{bg:"#280a0c",color:"#e07080"}],
+  navBg:"#1a2a3c", headerBg:"linear-gradient(135deg,#305888 0%,#2e6e50 100%)",
+  activityBg:"#111e2c", segBg:"#1a2e42",
+  statCard:"#111e30", warningBg:"#1c1600", warningBorder:"#8a6400",
 };
 
 function StarRating({ icon, value, max=5, onChange, color, size=18 }) {
@@ -271,12 +271,18 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
   return (
     <div style={{position:"relative",overflow:"hidden",borderRadius:14}}>
       {/* Fond swipe droit (planifier) */}
-      {swipeHint==='right'&&<div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,#4f86c6,#6bab8a)",display:"flex",alignItems:"center",paddingLeft:16,borderRadius:14,zIndex:0}}>
-        <span style={{fontSize:20,color:"white",fontWeight:700}}>📅 Planifier</span>
+      {swipeHint==='right'&&<div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,#4f86c6,#6bab8a)",display:"flex",alignItems:"center",paddingLeft:16,borderRadius:18,zIndex:0}}>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,transition:"transform 0.1s"}}>
+          <span style={{fontSize:Math.min(16+Math.abs(swipeX)/8,32),transition:"font-size 0.1s",filter:"drop-shadow(0 2px 4px rgba(0,0,0,0.2))"}}>📅</span>
+          <span style={{color:"white",fontSize:10,fontWeight:700,opacity:Math.min(Math.abs(swipeX)/60,1)}}>Planifier</span>
+        </div>
       </div>}
       {/* Fond swipe gauche (favori) */}
-      {swipeHint==='left'&&<div style={{position:"absolute",inset:0,background:dish.favorite?"#e05c6a":"#f59e0b",display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:16,borderRadius:14,zIndex:0}}>
-        <span style={{fontSize:20,color:"white",fontWeight:700}}>{dish.favorite?"☆ Retirer":"★ Favori"}</span>
+      {swipeHint==='left'&&<div style={{position:"absolute",inset:0,background:dish.favorite?"#e05c6a":"#f59e0b",display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:16,borderRadius:18,zIndex:0}}>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+          <span style={{fontSize:Math.min(16+Math.abs(swipeX)/8,32),transition:"font-size 0.1s",filter:"drop-shadow(0 2px 4px rgba(0,0,0,0.2))"}}>★</span>
+          <span style={{color:"white",fontSize:10,fontWeight:700,opacity:Math.min(Math.abs(swipeX)/60,1)}}>{dish.favorite?"Retirer":"Favori"}</span>
+        </div>
       </div>}
 
       {/* Carte principale */}
@@ -377,6 +383,24 @@ export default function App() {
   const lastBackPress = useRef(0);
 
   useEffect(() => { save("dark", dark); }, [dark]);
+
+  // ── Bloquer scroll body quand viewDish ouvert ──
+  useEffect(() => {
+    if (viewDish) {
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+    };
+  }, [viewDish]);
 
   // ── Android back button ──
   useEffect(() => {
@@ -683,7 +707,7 @@ export default function App() {
           </div>
         </div>
         <div><label style={s.label}>★ Mon goût ({currentUser})</label><StarRating icon="★" value={myTaste} onChange={v=>set("tasteByUser",{...form.tasteByUser,[currentUser]:v})} color="#f59e0b" size={24}/></div>
-        <div><label style={s.label}>🍽️ Vaisselle</label><StarRating icon="🍽️" value={form.dishesRating} onChange={v=>set("dishesRating",v)} color={T.accent} size={22}/></div>
+        <div><label style={s.label}>🍽️ Vaisselle</label><StarRating icon="🫧" value={form.dishesRating} onChange={v=>set("dishesRating",v)} color={T.accent} size={22}/></div>
         <div><label style={s.label}>⏱️ Temps de préparation</label><StarRating icon="⏱️" value={form.timeRating} onChange={v=>set("timeRating",v)} color={T.green} size={22}/></div>
         <div><label style={s.label}>Recette</label><textarea value={form.recipe} onChange={e=>set("recipe",e.target.value)} style={{...s.input,height:90,resize:"vertical"}} placeholder="Instructions, notes..."/></div>
         <div><label style={s.label}>Liens</label><LinksEditor links={form.links} onChange={v=>set("links",v)} T={T} s={s}/></div>
@@ -805,14 +829,22 @@ export default function App() {
 
           {/* Grille 2 colonnes */}
           {filteredDishes.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"40px 0"}}>Aucun plat trouvé 🍽️</div>}
+          <style>{`
+            @keyframes cardSlideUp {
+              from { opacity: 0; transform: translateY(22px); }
+              to   { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {filteredDishes.map(d=>(
-              <SwipeCard key={d.id} dish={d} T={T} catColor={catColor}
-                onTap={dish=>setViewDish(dish)}
-                onSwipeRight={dish=>{ setPendingDishForPlan(dish); setPlanSlot("__pick__"); setSelectedSlots([]); }}
-                onSwipeLeft={dish=>toggleFav(dish)}
-                onLongPress={dish=>setRatingModal(dish)}
-              />
+            {filteredDishes.map((d,i)=>(
+              <div key={d.id} style={{animation:`cardSlideUp 0.35s ease both`,animationDelay:`${Math.min(i*0.06,0.5)}s`}}>
+                <SwipeCard dish={d} T={T} catColor={catColor}
+                  onTap={dish=>setViewDish(dish)}
+                  onSwipeRight={dish=>{ setPendingDishForPlan(dish); setPlanSlot("__pick__"); setSelectedSlots([]); }}
+                  onSwipeLeft={dish=>toggleFav(dish)}
+                  onLongPress={dish=>setRatingModal(dish)}
+                />
+              </div>
             ))}
           </div>
         </div>}
@@ -933,7 +965,7 @@ export default function App() {
         const hasPhoto=!!(d.photo||d.thumbnail);
         return (
           <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.6)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setViewDish(null)}>
-            <div style={{background:T.card,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:`0 -20px 60px ${T.shadowMd}`,overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+            <div style={{background:T.card,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",overscrollBehavior:"contain",WebkitOverflowScrolling:"touch",boxShadow:`0 -20px 60px ${T.shadowMd}`}} onClick={e=>e.stopPropagation()}>
               {/* Photo plein écran bord à bord */}
               <div style={{position:"relative",width:"100%",flexShrink:0,background:hasPhoto?"#111":T.headerBg}}>
                 {hasPhoto
@@ -962,7 +994,7 @@ export default function App() {
                   {Object.keys(d.tasteByUser||{}).length>0&&<div style={{fontSize:12,color:T.textMuted,marginTop:4}}>Moyenne : <strong style={{color:T.text}}>{avgTaste(d).toFixed(1)}/5</strong></div>}
                 </div>
                 <div style={{display:"flex",gap:20}}>
-                  <div><div style={{fontSize:11,color:T.textMuted,marginBottom:4}}>Vaisselle</div><StarRating icon="🍽️" value={d.dishesRating||0} max={5} color={T.accent} size={16}/></div>
+                  <div><div style={{fontSize:11,color:T.textMuted,marginBottom:4}}>Vaisselle</div><StarRating icon="🫧" value={d.dishesRating||0} max={5} color={T.accent} size={16}/></div>
                   <div><div style={{fontSize:11,color:T.textMuted,marginBottom:4}}>Temps</div><StarRating icon="⏱️" value={d.timeRating||0} max={5} color={T.green} size={16}/></div>
                 </div>
                 {d.recipe&&<div><div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Recette</div><div style={{fontSize:13,color:T.text,lineHeight:1.7,whiteSpace:"pre-wrap",background:T.activityBg,padding:"12px 14px",borderRadius:12}}>{d.recipe}</div></div>}
