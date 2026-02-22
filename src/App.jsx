@@ -284,10 +284,10 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
         onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
         style={{
           background:T.card, border:`1px solid ${dish.favorite?T.accent:T.cardBorder}`,
-          borderRadius:14, overflow:"hidden", cursor:"pointer",
+          borderRadius:18, overflow:"hidden", cursor:"pointer",
           transform:`translateX(${swipeX}px)`,
           transition: swipeX===0?"transform 0.25s ease":"none",
-          boxShadow:`0 2px 12px ${T.shadow}`,
+          boxShadow:`0 4px 20px ${T.shadow}, 0 1px 4px rgba(0,0,0,0.05)`,
           position:"relative", zIndex:1,
           userSelect:"none", WebkitUserSelect:"none",
         }}
@@ -562,7 +562,7 @@ export default function App() {
 
   const s = {
     app:{fontFamily:"'Inter','Segoe UI',system-ui,sans-serif",background:T.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto",display:"flex",flexDirection:"column",color:T.text},
-    card:{background:T.card,border:`1px solid ${T.cardBorder}`,borderRadius:14,padding:"14px 16px",boxShadow:`0 2px 12px ${T.shadow}`},
+    card:{background:T.card,border:"none",borderRadius:18,padding:"14px 16px",boxShadow:`0 4px 20px ${T.shadow}, 0 1px 4px rgba(0,0,0,0.05)`},
     input:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1.5px solid ${T.inputBorder}`,fontSize:14,background:T.input,color:T.text,boxSizing:"border-box",outline:"none",fontFamily:"inherit"},
     label:{display:"block",fontSize:11,fontWeight:700,color:T.textMuted,marginBottom:5,textTransform:"uppercase",letterSpacing:0.6},
     primary:{background:T.accent,color:"white",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:600,fontSize:14,cursor:"pointer",fontFamily:"inherit"},
@@ -732,37 +732,41 @@ export default function App() {
 
   return (
     <div style={s.app}>
-      {/* HEADER */}
-      <div style={{background:T.headerBg,padding:"18px 20px 14px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <div style={{fontSize:22,fontWeight:800,color:"white",letterSpacing:-0.3}}>🥗 Orga de plat</div>
-            <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginTop:2}}>{ALLOWED_EMAILS[authUser?.email]?.avatar} Bonjour, {currentUser}</div>
+      {/* HEADER COMPACT + TABS INTÉGRÉS */}
+      <div style={{background:T.headerBg}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px 6px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:22}}>🥗</span>
+            <div>
+              <div style={{fontSize:16,fontWeight:800,color:"white",letterSpacing:-0.3,lineHeight:1.1}}>Orga de plat</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",lineHeight:1.2}}>
+                {ALLOWED_EMAILS[authUser?.email]?.avatar} {currentUser}
+                {computeStats.missingSlots.length>0&&<span style={{marginLeft:6,opacity:0.85}}>· {computeStats.missingSlots.length} créneaux à planifier</span>}
+              </div>
+            </div>
           </div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>setDark(d=>!d)} style={{background:"rgba(255,255,255,0.2)",border:"none",borderRadius:8,padding:"6px 10px",fontSize:16,cursor:"pointer",color:"white"}}>{dark?"☀️":"🌙"}</button>
-            <button onClick={()=>signOut(auth)} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",color:"white",fontFamily:"inherit",fontWeight:600}}>Quitter</button>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>setDark(d=>!d)} style={{background:"rgba(255,255,255,0.18)",border:"none",borderRadius:8,padding:"5px 9px",fontSize:15,cursor:"pointer",color:"white"}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={()=>signOut(auth)} style={{background:"rgba(255,255,255,0.13)",border:"1px solid rgba(255,255,255,0.28)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer",color:"white",fontFamily:"inherit",fontWeight:600}}>Quitter</button>
           </div>
         </div>
-        {computeStats.missingSlots.length>0&&<div style={{marginTop:12,background:"rgba(255,255,255,0.15)",borderRadius:10,padding:"8px 12px",fontSize:12,color:"rgba(255,255,255,0.9)"}}>💡 Il manque encore <strong>{computeStats.missingSlots.length}</strong> créneau{computeStats.missingSlots.length>1?"x":""} à planifier cette semaine</div>}
-      </div>
-
-      {/* TABS — Style A pill */}
-      <div style={{background:T.navBg,borderBottom:`1px solid ${T.cardBorder}`,padding:"6px 8px 0"}}>
-        <div style={{display:"flex",gap:2}}>
+        {/* TABS fondus dans le bandeau */}
+        <div style={{display:"flex",gap:2,padding:"0 6px"}}>
           {TABS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{
-              flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3,
-              padding:"6px 2px 8px", border:"none", cursor:"pointer", fontFamily:"inherit",
-              background: tab===t.id ? T.accentLight : "transparent",
+              flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2,
+              padding:"5px 2px 7px", border:"none", cursor:"pointer", fontFamily:"inherit",
+              background: tab===t.id ? "rgba(255,255,255,0.18)" : "transparent",
               borderRadius:"10px 10px 0 0",
               transition:"background 0.15s",
             }}>
-              <span style={{fontSize:18, filter: tab===t.id ? "none" : "grayscale(1) opacity(0.45)"}}>{t.icon}</span>
-              <span style={{fontSize:9.5, fontWeight: tab===t.id?700:500, color: tab===t.id?T.accent:T.textMuted}}>{t.label}</span>
+              <span style={{fontSize:17, filter: tab===t.id ? "none" : "grayscale(1) opacity(0.5)"}}>{t.icon}</span>
+              <span style={{fontSize:9, fontWeight: tab===t.id?700:500, color: tab===t.id?"white":"rgba(255,255,255,0.55)"}}>{t.label}</span>
             </button>
           ))}
         </div>
+        {/* Barre blanche de séparation avec fond page */}
+        <div style={{height:10,background:T.bg,borderRadius:"14px 14px 0 0",marginTop:-1}}/>
       </div>
 
       {/* CONTENT */}
@@ -926,29 +930,53 @@ export default function App() {
         const d=dishes.find(x=>x.id===viewDish.id)||viewDish;
         const cats=d.categories||[];
         const links=d.links||[];
-        return <Modal title={d.name} onClose={()=>setViewDish(null)}>
-          <div style={{display:"flex",flexDirection:"column",gap:16}}>
-            {(d.photo||d.thumbnail)&&<img src={d.photo||d.thumbnail} alt="" style={{width:"100%",borderRadius:14,objectFit:"contain",maxHeight:300,background:T.activityBg}}/>}
-            {cats.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{cats.map(cat=>{const c=catColor(cat);return <span key={cat} style={{fontSize:11,fontWeight:700,color:c.color,background:c.bg,borderRadius:10,padding:"3px 10px"}}>{cat}</span>;})} {d.favorite&&<span style={{fontSize:11,fontWeight:700,color:"#f59e0b",background:"#fef3c7",borderRadius:10,padding:"3px 10px"}}>★ Favori</span>}</div>}
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>Notes de goût</div>
-              {Object.values(ALLOWED_EMAILS).map(u=><div key={u.displayName} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><Avatar user={u.displayName} size={24}/><span style={{fontSize:13,color:T.text,width:58,fontWeight:600}}>{u.displayName}</span><StarRating icon="★" value={d.tasteByUser?.[u.displayName]||0} max={5} color="#f59e0b" size={18} onChange={currentUser===u.displayName?v=>updateTaste(d,v):undefined}/><span style={{fontSize:11,color:T.textLight}}>{d.tasteByUser?.[u.displayName]?`${d.tasteByUser[u.displayName]}/5`:"—"}</span></div>)}
-              {Object.keys(d.tasteByUser||{}).length>0&&<div style={{fontSize:12,color:T.textMuted,marginTop:4}}>Moyenne : <strong style={{color:T.text}}>{avgTaste(d).toFixed(1)}/5</strong></div>}
+        const hasPhoto=!!(d.photo||d.thumbnail);
+        return (
+          <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.6)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setViewDish(null)}>
+            <div style={{background:T.card,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:`0 -20px 60px ${T.shadowMd}`}} onClick={e=>e.stopPropagation()}>
+              {/* Photo plein écran bord à bord */}
+              <div style={{position:"relative",width:"100%",height:hasPhoto?220:100,flexShrink:0,overflow:"hidden",background:hasPhoto?"#000":T.headerBg,borderRadius:"24px 24px 0 0"}}>
+                {hasPhoto
+                  ? <img src={d.photo||d.thumbnail} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                  : <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:56}}>🍽️</div>
+                }
+                {/* Dégradé bas pour lisibilité du titre */}
+                <div style={{position:"absolute",bottom:0,left:0,right:0,height:hasPhoto?100:60,background:"linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%)"}}/>
+                {/* Titre + catégories en overlay */}
+                <div style={{position:"absolute",bottom:14,left:16,right:48}}>
+                  <div style={{fontSize:20,fontWeight:800,color:"white",lineHeight:1.2,textShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>{d.name}</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>
+                    {cats.map(cat=>{const c=catColor(cat);return <span key={cat} style={{fontSize:10,fontWeight:700,color:c.color,background:"rgba(255,255,255,0.92)",borderRadius:8,padding:"2px 8px"}}>{cat}</span>;})}
+                    {d.favorite&&<span style={{fontSize:10,fontWeight:700,color:"#d97706",background:"rgba(255,255,255,0.92)",borderRadius:8,padding:"2px 8px"}}>★ Favori</span>}
+                  </div>
+                </div>
+                {/* Bouton fermer */}
+                <button onClick={()=>setViewDish(null)} style={{position:"absolute",top:12,right:12,background:"rgba(0,0,0,0.4)",border:"none",borderRadius:10,padding:"5px 10px",fontSize:18,color:"white",cursor:"pointer",lineHeight:1,backdropFilter:"blur(4px)"}}>×</button>
+              </div>
+
+              {/* Contenu scrollable */}
+              <div style={{padding:"18px 18px 28px",display:"flex",flexDirection:"column",gap:16}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>Notes de goût</div>
+                  {Object.values(ALLOWED_EMAILS).map(u=><div key={u.displayName} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><Avatar user={u.displayName} size={24}/><span style={{fontSize:13,color:T.text,width:58,fontWeight:600}}>{u.displayName}</span><StarRating icon="★" value={d.tasteByUser?.[u.displayName]||0} max={5} color="#f59e0b" size={18} onChange={currentUser===u.displayName?v=>updateTaste(d,v):undefined}/><span style={{fontSize:11,color:T.textLight}}>{d.tasteByUser?.[u.displayName]?`${d.tasteByUser[u.displayName]}/5`:"—"}</span></div>)}
+                  {Object.keys(d.tasteByUser||{}).length>0&&<div style={{fontSize:12,color:T.textMuted,marginTop:4}}>Moyenne : <strong style={{color:T.text}}>{avgTaste(d).toFixed(1)}/5</strong></div>}
+                </div>
+                <div style={{display:"flex",gap:20}}>
+                  <div><div style={{fontSize:11,color:T.textMuted,marginBottom:4}}>Vaisselle</div><StarRating icon="🍽️" value={d.dishesRating||0} max={5} color={T.accent} size={16}/></div>
+                  <div><div style={{fontSize:11,color:T.textMuted,marginBottom:4}}>Temps</div><StarRating icon="⏱️" value={d.timeRating||0} max={5} color={T.green} size={16}/></div>
+                </div>
+                {d.recipe&&<div><div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Recette</div><div style={{fontSize:13,color:T.text,lineHeight:1.7,whiteSpace:"pre-wrap",background:T.activityBg,padding:"12px 14px",borderRadius:12}}>{d.recipe}</div></div>}
+                {links.filter(l=>l.url).length>0&&<div><div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Liens</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{links.filter(l=>l.url).map((l,i)=><a key={i} href={l.url} target="_blank" rel="noreferrer" style={{fontSize:13,color:T.accent,display:"flex",alignItems:"center",gap:6}}>🔗 {l.label||l.url}</a>)}</div></div>}
+                <div style={{fontSize:11,color:T.textLight,display:"flex",alignItems:"center",gap:5}}><Avatar user={d.updatedBy} size={14}/>Modifié par <strong>{d.updatedBy}</strong> · {formatTimeAgo(d.updatedAt)}</div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{setEditDish(d);setViewDish(null);}} style={{...s.ghost,flex:1}}>✏️ Modifier</button>
+                  <button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setViewDish(null);}} style={{...s.primary,flex:1}}>📅 Planifier</button>
+                </div>
+                <button onClick={()=>{deleteDish(d.id,d.name);setViewDish(null);}} style={{...s.ghost,width:"100%",color:T.danger,borderColor:T.danger}}>🗑️ Supprimer ce plat</button>
+              </div>
             </div>
-            <div style={{display:"flex",gap:20}}>
-              <div><div style={{fontSize:11,color:T.textMuted,marginBottom:4}}>Vaisselle</div><StarRating icon="🍽️" value={d.dishesRating||0} max={5} color={T.accent} size={16}/></div>
-              <div><div style={{fontSize:11,color:T.textMuted,marginBottom:4}}>Temps</div><StarRating icon="⏱️" value={d.timeRating||0} max={5} color={T.green} size={16}/></div>
-            </div>
-            {d.recipe&&<div><div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Recette</div><div style={{fontSize:13,color:T.text,lineHeight:1.7,whiteSpace:"pre-wrap",background:T.activityBg,padding:"12px 14px",borderRadius:10}}>{d.recipe}</div></div>}
-            {links.filter(l=>l.url).length>0&&<div><div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Liens</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{links.filter(l=>l.url).map((l,i)=><a key={i} href={l.url} target="_blank" rel="noreferrer" style={{fontSize:13,color:T.accent,display:"flex",alignItems:"center",gap:6}}>🔗 {l.label||l.url}</a>)}</div></div>}
-            <div style={{fontSize:11,color:T.textLight,display:"flex",alignItems:"center",gap:5}}><Avatar user={d.updatedBy} size={14}/>Modifié par <strong>{d.updatedBy}</strong> · {formatTimeAgo(d.updatedAt)}</div>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{setEditDish(d);setViewDish(null);}} style={{...s.ghost,flex:1}}>✏️ Modifier</button>
-              <button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setViewDish(null);}} style={{...s.primary,flex:1}}>📅 Planifier</button>
-            </div>
-            <button onClick={()=>{deleteDish(d.id,d.name);setViewDish(null);}} style={{...s.ghost,width:"100%",color:T.danger,borderColor:T.danger}}>🗑️ Supprimer ce plat</button>
           </div>
-        </Modal>;
+        );
       })()}
 
       {/* Modale notation rapide (appui long) */}
