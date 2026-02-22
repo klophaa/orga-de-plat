@@ -1458,8 +1458,7 @@ export default function App() {
               </div>}
             </div>;
           })()}
-        </div>}
-      </div>
+        </div></div></div></div>}
 
       {/* ══ CONFETTIS ══ */}
       {showConfetti&&<div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:9999,overflow:"hidden"}}>
