@@ -46,6 +46,9 @@
 // ── v9.1 ────────────────────────────────────────────────────────
 // + Swipe plus facile : seuil réduit 60px → 40px
 // + Détection du flick (geste rapide court) pour déclencher le swipe sans distance complète
+//
+// ── v9.2 ────────────────────────────────────────────────────────
+// + Support souris sur desktop : clic + drag sur les cartes (onMouseDown/Move/Up/Leave)
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -259,9 +262,10 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
   const avg = () => { const v=Object.values(dish.tasteByUser||{}).filter(Boolean); return v.length?v.reduce((a,b)=>a+b,0)/v.length:0; };
   const cats = dish.categories || [];
 
-  const onTouchStart = e => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
+  // ── Logique commune start/move/end ──
+  const handleStart = (clientX, clientY) => {
+    touchStartX.current = clientX;
+    touchStartY.current = clientY;
     touchStartTime.current = Date.now();
     didSwipe.current = false;
     didLongPress.current = false;
@@ -271,14 +275,13 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
     }, LONG_PRESS_MS);
   };
 
-  const onTouchMove = e => {
+  const handleMove = (clientX, clientY) => {
     if (touchStartX.current === null) return;
-    const dx = e.touches[0].clientX - touchStartX.current;
-    const dy = e.touches[0].clientY - touchStartY.current;
-    // Si mouvement vertical détecté → annule tout (scroll normal)
+    const dx = clientX - touchStartX.current;
+    const dy = clientY - touchStartY.current;
     if (Math.abs(dy) > 8) {
       clearTimeout(longPressTimer.current);
-      didSwipe.current = true; // empêche le tap au touchEnd
+      didSwipe.current = true;
       setSwipeX(0);
       setSwipeHint(null);
       return;
@@ -291,12 +294,12 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
     }
   };
 
-  const onTouchEnd = e => {
+  const handleEnd = () => {
     clearTimeout(longPressTimer.current);
     const dx = swipeX;
     const dt = Date.now() - (touchStartTime.current || Date.now());
-    const velocity = Math.abs(dx) / Math.max(dt, 1); // px/ms
-    const isFlick = velocity > 0.3 && Math.abs(dx) > 15; // flick rapide même court
+    const velocity = Math.abs(dx) / Math.max(dt, 1);
+    const isFlick = velocity > 0.3 && Math.abs(dx) > 15;
     setSwipeX(0);
     setSwipeHint(null);
     if (didLongPress.current) return;
@@ -309,6 +312,18 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
     touchStartX.current = null;
     didSwipe.current = false;
   };
+
+  // ── Touch events ──
+  const onTouchStart = e => handleStart(e.touches[0].clientX, e.touches[0].clientY);
+  const onTouchMove  = e => handleMove(e.touches[0].clientX, e.touches[0].clientY);
+  const onTouchEnd   = () => handleEnd();
+
+  // ── Mouse events (desktop) ──
+  const isDragging = useRef(false);
+  const onMouseDown = e => { isDragging.current = true; handleStart(e.clientX, e.clientY); };
+  const onMouseMove = e => { if (!isDragging.current) return; handleMove(e.clientX, e.clientY); };
+  const onMouseUp   = () => { if (!isDragging.current) return; isDragging.current = false; handleEnd(); };
+  const onMouseLeave= () => { if (!isDragging.current) return; isDragging.current = false; setSwipeX(0); setSwipeHint(null); touchStartX.current = null; didSwipe.current = false; };
 
   const avgVal = avg();
 
@@ -332,6 +347,7 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
       {/* Carte principale */}
       <div
         onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseLeave}
         style={{
           background:T.card, border:`1px solid ${dish.favorite?T.accent:T.cardBorder}`,
           borderRadius:18, overflow:"hidden", cursor:"pointer",
