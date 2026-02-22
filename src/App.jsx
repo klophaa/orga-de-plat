@@ -1,8 +1,12 @@
-// ORGA DE PLAT — v5
-// + Annulation suppression (toast undo)
-// + Plusieurs liens dans plats et idées  
-// + Recadrage photo carré (crop interactif déplacement + zoom)
-// + Photo entière dans la fiche, miniature recadrée
+// ORGA DE PLAT — v6
+// + Grille 2 colonnes avec grandes miniatures
+// + Note de goût en haut gauche, favori en haut droit de la miniature
+// + Swipe droit = planifier, swipe gauche = toggle favori
+// + Appui long = modale notation goût
+// + Tri catégories par boutons (plus de select)
+// + Suppression filtre note de goût
+// + Bouton remise à zéro du planning
+// + Bouton retour Android : revient à la page précédente, double tap = quitter
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -28,11 +32,13 @@ const DEFAULT_CATEGORIES = ["Fat","Pas trop fat","Diet","Asiat","Finger food","D
 const WEEKDAY_SLOTS = ["Lundi midi","Lundi soir","Mardi midi","Mardi soir","Mercredi midi","Mercredi soir","Jeudi midi","Jeudi soir","Vendredi midi"];
 const WEEKEND_SLOTS = ["Vendredi soir","Samedi midi","Samedi soir","Dimanche midi","Dimanche soir"];
 const ALL_SLOTS = [...WEEKDAY_SLOTS, ...WEEKEND_SLOTS];
+const SWIPE_THRESHOLD = 60; // px
+const LONG_PRESS_MS = 500;
 
-function getWeekKey(date = new Date()) {
-  const d = new Date(date); d.setHours(0,0,0,0);
-  d.setDate(d.getDate() - d.getDay() + 1);
-  return d.toISOString().slice(0,10);
+function getWeekKey(d = new Date()) {
+  const x = new Date(d); x.setHours(0,0,0,0);
+  x.setDate(x.getDate() - x.getDay() + 1);
+  return x.toISOString().slice(0,10);
 }
 function formatTimeAgo(ts) {
   if (!ts) return "";
@@ -87,7 +93,8 @@ function StarRating({ icon, value, max=5, onChange, color, size=18 }) {
   return (
     <div style={{display:"flex",gap:3}}>
       {Array.from({length:max}).map((_,i) => (
-        <span key={i} onClick={() => onChange?.(i+1)} style={{fontSize:size,cursor:onChange?"pointer":"default",opacity:i<value?1:0.15,color,userSelect:"none"}}>{icon}</span>
+        <span key={i} onClick={() => onChange?.(i+1)}
+          style={{fontSize:size,cursor:onChange?"pointer":"default",opacity:i<value?1:0.15,color,userSelect:"none"}}>{icon}</span>
       ))}
     </div>
   );
@@ -105,106 +112,87 @@ function Spinner({T}) {
   );
 }
 
-// ─── OUTIL DE CROP ───────────────────────────────────────────────────────────
+// ─── CROP TOOL ───────────────────────────────────────────────────────────────
 function CropTool({ src, onDone, onCancel, T }) {
   const SIZE = 300;
-  const [imgNatural, setImgNatural] = useState({ w: 1, h: 1 });
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [imgNat, setImgNat] = useState({ w:1, h:1 });
+  const [offset, setOffset] = useState({ x:0, y:0 });
   const [scale, setScale] = useState(1);
   const imgRef = useRef(null);
   const dragging = useRef(false);
-  const lastPos = useRef({ x: 0, y: 0 });
-
-  const minScale = (w, h) => Math.max(SIZE / w, SIZE / h);
-
+  const lastPos = useRef({ x:0, y:0 });
+  const minSc = (w,h) => Math.max(SIZE/w, SIZE/h);
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      const w = img.naturalWidth, h = img.naturalHeight;
-      setImgNatural({ w, h });
-      const ms = minScale(w, h);
+      const w=img.naturalWidth, h=img.naturalHeight;
+      setImgNat({w,h});
+      const ms=minSc(w,h);
       setScale(ms);
-      setOffset({ x: (SIZE - w * ms) / 2, y: (SIZE - h * ms) / 2 });
+      setOffset({x:(SIZE-w*ms)/2, y:(SIZE-h*ms)/2});
     };
     img.src = src;
   }, [src]);
-
-  const clamp = (ox, oy, sc) => ({
-    x: Math.min(0, Math.max(SIZE - imgNatural.w * sc, ox)),
-    y: Math.min(0, Math.max(SIZE - imgNatural.h * sc, oy)),
+  const clamp = (ox,oy,sc) => ({
+    x: Math.min(0, Math.max(SIZE-imgNat.w*sc, ox)),
+    y: Math.min(0, Math.max(SIZE-imgNat.h*sc, oy)),
   });
-
-  const onPDown = e => { dragging.current = true; lastPos.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); };
-  const onPMove = e => {
+  const onPD = e => { dragging.current=true; lastPos.current={x:e.clientX,y:e.clientY}; e.currentTarget.setPointerCapture(e.pointerId); };
+  const onPM = e => {
     if (!dragging.current) return;
-    const dx = e.clientX - lastPos.current.x, dy = e.clientY - lastPos.current.y;
-    lastPos.current = { x: e.clientX, y: e.clientY };
-    setOffset(o => clamp(o.x + dx, o.y + dy, scale));
+    const dx=e.clientX-lastPos.current.x, dy=e.clientY-lastPos.current.y;
+    lastPos.current={x:e.clientX,y:e.clientY};
+    setOffset(o=>clamp(o.x+dx, o.y+dy, scale));
   };
-  const onPUp = () => { dragging.current = false; };
-  const onWheel = e => {
+  const onPU = () => { dragging.current=false; };
+  const onW = e => {
     e.preventDefault();
-    const ns = Math.max(minScale(imgNatural.w, imgNatural.h), Math.min(6, scale * (e.deltaY > 0 ? 0.92 : 1.08)));
-    setScale(ns);
-    setOffset(o => clamp(o.x, o.y, ns));
+    const ns=Math.max(minSc(imgNat.w,imgNat.h), Math.min(6, scale*(e.deltaY>0?0.92:1.08)));
+    setScale(ns); setOffset(o=>clamp(o.x,o.y,ns));
   };
-
-  const handleConfirm = () => {
-    const img = imgRef.current;
-    // Thumbnail carrée 400x400
-    const tc = document.createElement("canvas"); tc.width = 400; tc.height = 400;
-    const tCtx = tc.getContext("2d");
-    tCtx.drawImage(img, -offset.x / scale, -offset.y / scale, SIZE / scale, SIZE / scale, 0, 0, 400, 400);
-    const thumbnail = tc.toDataURL("image/jpeg", 0.85);
-    // Photo entière (max 1200px)
-    const fc = document.createElement("canvas");
-    const r = Math.min(1, 1200 / Math.max(img.naturalWidth, img.naturalHeight));
-    fc.width = img.naturalWidth * r; fc.height = img.naturalHeight * r;
-    fc.getContext("2d").drawImage(img, 0, 0, fc.width, fc.height);
-    const full = fc.toDataURL("image/jpeg", 0.85);
-    onDone({ thumbnail, full });
+  const confirm = () => {
+    const img=imgRef.current;
+    const tc=document.createElement("canvas"); tc.width=400; tc.height=400;
+    tc.getContext("2d").drawImage(img, -offset.x/scale, -offset.y/scale, SIZE/scale, SIZE/scale, 0, 0, 400, 400);
+    const thumbnail=tc.toDataURL("image/jpeg",0.85);
+    const fc=document.createElement("canvas");
+    const r=Math.min(1,1200/Math.max(img.naturalWidth,img.naturalHeight));
+    fc.width=img.naturalWidth*r; fc.height=img.naturalHeight*r;
+    fc.getContext("2d").drawImage(img,0,0,fc.width,fc.height);
+    onDone({thumbnail, full:fc.toDataURL("image/jpeg",0.85)});
   };
-
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16,alignItems:"center"}}>
-      <div style={{fontSize:13,color:T.textMuted,textAlign:"center",lineHeight:1.5}}>
-        <strong>Déplace</strong> pour cadrer · <strong>Zoom</strong> avec le curseur ou la molette
-      </div>
+      <div style={{fontSize:13,color:T.textMuted,textAlign:"center",lineHeight:1.5}}><strong>Déplace</strong> pour cadrer · <strong>Zoom</strong> avec le curseur ou la molette</div>
       <div style={{position:"relative",width:SIZE,height:SIZE,overflow:"hidden",borderRadius:16,border:`2.5px solid ${T.accent}`,cursor:"grab",touchAction:"none",userSelect:"none",background:"#000"}}
-        onPointerDown={onPDown} onPointerMove={onPMove} onPointerUp={onPUp} onPointerCancel={onPUp} onWheel={onWheel}>
-        <img ref={imgRef} src={src} alt="" draggable={false}
-          style={{position:"absolute",left:offset.x,top:offset.y,width:imgNatural.w*scale,height:imgNatural.h*scale,pointerEvents:"none"}}/>
-        {/* Grille de composition */}
+        onPointerDown={onPD} onPointerMove={onPM} onPointerUp={onPU} onPointerCancel={onPU} onWheel={onW}>
+        <img ref={imgRef} src={src} alt="" draggable={false} style={{position:"absolute",left:offset.x,top:offset.y,width:imgNat.w*scale,height:imgNat.h*scale,pointerEvents:"none"}}/>
         {[1,2].map(i=><div key={"h"+i} style={{position:"absolute",left:0,right:0,top:`${i*33.33}%`,height:1,background:"rgba(255,255,255,0.25)",pointerEvents:"none"}}/>)}
         {[1,2].map(i=><div key={"v"+i} style={{position:"absolute",top:0,bottom:0,left:`${i*33.33}%`,width:1,background:"rgba(255,255,255,0.25)",pointerEvents:"none"}}/>)}
-        {/* Coins */}
-        {[[0,0],[0,1],[1,0],[1,1]].map(([r,c])=>(
-          <div key={r+"-"+c} style={{position:"absolute",width:18,height:18,top:r?undefined:4,bottom:r?4:undefined,left:c?undefined:4,right:c?4:undefined,borderTop:r?"none":`2px solid white`,borderBottom:r?`2px solid white`:"none",borderLeft:c?"none":`2px solid white`,borderRight:c?`2px solid white`:"none",pointerEvents:"none"}}/>
-        ))}
+        {[[0,0],[0,1],[1,0],[1,1]].map(([r,c])=><div key={r+"-"+c} style={{position:"absolute",width:18,height:18,top:r?undefined:4,bottom:r?4:undefined,left:c?undefined:4,right:c?4:undefined,borderTop:r?"none":"2px solid white",borderBottom:r?"2px solid white":"none",borderLeft:c?"none":"2px solid white",borderRight:c?"2px solid white":"none",pointerEvents:"none"}}/>)}
       </div>
       <div style={{width:"100%"}}>
         <div style={{fontSize:11,color:T.textMuted,marginBottom:4,fontWeight:600}}>🔍 Zoom</div>
-        <input type="range" min={minScale(imgNatural.w,imgNatural.h)} max={6} step={0.01} value={scale}
-          onChange={e => { const ns=+e.target.value; setScale(ns); setOffset(o=>clamp(o.x,o.y,ns)); }}
-          style={{width:"100%",accentColor:T.accent}}/>
+        <input type="range" min={minSc(imgNat.w,imgNat.h)} max={6} step={0.01} value={scale}
+          onChange={e=>{const ns=+e.target.value;setScale(ns);setOffset(o=>clamp(o.x,o.y,ns));}} style={{width:"100%",accentColor:T.accent}}/>
       </div>
       <div style={{display:"flex",gap:8,width:"100%"}}>
         <button onClick={onCancel} style={{flex:1,padding:"11px",borderRadius:10,border:`1.5px solid ${T.inputBorder}`,background:"transparent",color:T.textMuted,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}>Annuler</button>
-        <button onClick={handleConfirm} style={{flex:2,padding:"11px",borderRadius:10,border:"none",background:T.accent,color:"white",cursor:"pointer",fontFamily:"inherit",fontWeight:700,fontSize:14}}>✓ Valider ce cadrage</button>
+        <button onClick={confirm} style={{flex:2,padding:"11px",borderRadius:10,border:"none",background:T.accent,color:"white",cursor:"pointer",fontFamily:"inherit",fontWeight:700,fontSize:14}}>✓ Valider ce cadrage</button>
       </div>
     </div>
   );
 }
 
-// ─── ÉDITEUR DE LIENS ────────────────────────────────────────────────────────
+// ─── LIENS EDITOR ────────────────────────────────────────────────────────────
 function LinksEditor({ links=[], onChange, T, s }) {
-  const add = () => onChange([...links, { label:"", url:"" }]);
-  const upd = (i,f,v) => onChange(links.map((l,idx) => idx===i ? {...l,[f]:v} : l));
-  const rem = i => onChange(links.filter((_,idx) => idx!==i));
+  const add = () => onChange([...links, {label:"",url:""}]);
+  const upd = (i,f,v) => onChange(links.map((l,idx)=>idx===i?{...l,[f]:v}:l));
+  const rem = i => onChange(links.filter((_,idx)=>idx!==i));
   return (
     <div>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {links.map((link,i) => (
+        {links.map((link,i)=>(
           <div key={i} style={{display:"flex",gap:6,alignItems:"center"}}>
             <input value={link.label} onChange={e=>upd(i,"label",e.target.value)} style={{...s.input,width:90,flexShrink:0,fontSize:12}} placeholder="Libellé"/>
             <input value={link.url} onChange={e=>upd(i,"url",e.target.value)} style={{...s.input,flex:1,fontSize:12}} placeholder="https://..."/>
@@ -213,6 +201,130 @@ function LinksEditor({ links=[], onChange, T, s }) {
         ))}
       </div>
       <button onClick={add} style={{marginTop:8,background:"transparent",border:`1.5px dashed ${T.inputBorder}`,borderRadius:8,padding:"6px 12px",fontSize:12,color:T.textMuted,cursor:"pointer",fontFamily:"inherit",width:"100%"}}>+ Ajouter un lien</button>
+    </div>
+  );
+}
+
+// ─── SWIPEABLE DISH CARD ─────────────────────────────────────────────────────
+function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, catColor }) {
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
+  const [swipeX, setSwipeX] = useState(0);
+  const [swipeHint, setSwipeHint] = useState(null); // 'right' | 'left' | null
+  const longPressTimer = useRef(null);
+  const didSwipe = useRef(false);
+  const didLongPress = useRef(false);
+
+  const thumb = dish.thumbnail || dish.photo;
+  const avg = () => { const v=Object.values(dish.tasteByUser||{}).filter(Boolean); return v.length?v.reduce((a,b)=>a+b,0)/v.length:0; };
+  const cats = dish.categories || [];
+
+  const onTouchStart = e => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    didSwipe.current = false;
+    didLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      didLongPress.current = true;
+      onLongPress(dish);
+    }, LONG_PRESS_MS);
+  };
+
+  const onTouchMove = e => {
+    if (touchStartX.current === null) return;
+    const dx = e.touches[0].clientX - touchStartX.current;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    if (Math.abs(dy) > Math.abs(dx) + 10) {
+      clearTimeout(longPressTimer.current);
+      return;
+    }
+    clearTimeout(longPressTimer.current);
+    if (Math.abs(dx) > 10) {
+      didSwipe.current = true;
+      setSwipeX(dx);
+      setSwipeHint(dx > 0 ? 'right' : 'left');
+    }
+  };
+
+  const onTouchEnd = e => {
+    clearTimeout(longPressTimer.current);
+    const dx = swipeX;
+    setSwipeX(0);
+    setSwipeHint(null);
+    if (didLongPress.current) return;
+    if (Math.abs(dx) >= SWIPE_THRESHOLD) {
+      if (dx > 0) onSwipeRight(dish);
+      else onSwipeLeft(dish);
+    } else if (!didSwipe.current) {
+      onTap(dish);
+    }
+    touchStartX.current = null;
+    didSwipe.current = false;
+  };
+
+  const avgVal = avg();
+
+  return (
+    <div style={{position:"relative",overflow:"hidden",borderRadius:14}}>
+      {/* Fond swipe droit (planifier) */}
+      {swipeHint==='right'&&<div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,#4f86c6,#6bab8a)",display:"flex",alignItems:"center",paddingLeft:16,borderRadius:14,zIndex:0}}>
+        <span style={{fontSize:20,color:"white",fontWeight:700}}>📅 Planifier</span>
+      </div>}
+      {/* Fond swipe gauche (favori) */}
+      {swipeHint==='left'&&<div style={{position:"absolute",inset:0,background:dish.favorite?"#e05c6a":"#f59e0b",display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:16,borderRadius:14,zIndex:0}}>
+        <span style={{fontSize:20,color:"white",fontWeight:700}}>{dish.favorite?"☆ Retirer":"★ Favori"}</span>
+      </div>}
+
+      {/* Carte principale */}
+      <div
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        style={{
+          background:T.card, border:`1px solid ${dish.favorite?T.accent:T.cardBorder}`,
+          borderRadius:14, overflow:"hidden", cursor:"pointer",
+          transform:`translateX(${swipeX}px)`,
+          transition: swipeX===0?"transform 0.25s ease":"none",
+          boxShadow:`0 2px 12px ${T.shadow}`,
+          position:"relative", zIndex:1,
+          userSelect:"none", WebkitUserSelect:"none",
+        }}
+      >
+        {/* Miniature grande */}
+        <div style={{position:"relative",width:"100%",aspectRatio:"1/1",background:T.accentLight,overflow:"hidden"}}>
+          {thumb
+            ? <img src={thumb} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+            : <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:48}}>🍽️</div>
+          }
+          {/* Note de goût — haut gauche */}
+          {avgVal > 0 && (
+            <div style={{position:"absolute",top:6,left:6,background:"rgba(0,0,0,0.55)",borderRadius:8,padding:"3px 7px",display:"flex",alignItems:"center",gap:3}}>
+              <span style={{color:"#f59e0b",fontSize:12}}>★</span>
+              <span style={{color:"white",fontSize:11,fontWeight:700}}>{avgVal.toFixed(1)}</span>
+            </div>
+          )}
+          {/* Favori — haut droit */}
+          {dish.favorite && (
+            <div style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,0.55)",borderRadius:8,padding:"4px 6px",fontSize:14,lineHeight:1}}>
+              ★
+            </div>
+          )}
+        </div>
+
+        {/* Infos sous la miniature */}
+        <div style={{padding:"10px 10px 12px"}}>
+          <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:6,lineHeight:1.3,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{dish.name}</div>
+          {cats.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:3,marginBottom:8}}>{cats.slice(0,2).map(cat=>{const c=catColor(cat);return <span key={cat} style={{fontSize:9,fontWeight:700,color:c.color,background:c.bg,borderRadius:8,padding:"2px 6px"}}>{cat}</span>;})}{cats.length>2&&<span style={{fontSize:9,color:T.textLight}}>+{cats.length-2}</span>}</div>}
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <div style={{display:"flex",alignItems:"center",gap:3,flex:1}}>
+              <span style={{fontSize:11}}>🍽️</span>
+              <div style={{display:"flex",gap:1}}>{Array.from({length:5}).map((_,i)=><span key={i} style={{fontSize:10,opacity:i<(dish.dishesRating||0)?1:0.15,color:T.accent}}>●</span>)}</div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:3,flex:1}}>
+              <span style={{fontSize:11}}>⏱️</span>
+              <div style={{display:"flex",gap:1}}>{Array.from({length:5}).map((_,i)=><span key={i} style={{fontSize:10,opacity:i<(dish.timeRating||0)?1:0.15,color:T.green}}>●</span>)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -236,6 +348,7 @@ export default function App() {
   const [dataLoading, setDataLoading] = useState(true);
 
   const [tab, setTab] = useState("dishes");
+  const [modalStack, setModalStack] = useState([]); // for back button
   const [showAddDish, setShowAddDish] = useState(false);
   const [editDish, setEditDish] = useState(null);
   const [viewDish, setViewDish] = useState(null);
@@ -248,7 +361,6 @@ export default function App() {
   const [randomFilters, setRandomFilters] = useState({category:"",minTaste:1,maxTime:5,maxDishes:5});
   const [searchQ, setSearchQ] = useState("");
   const [filterCat, setFilterCat] = useState("");
-  const [filterMinTaste, setFilterMinTaste] = useState(0);
   const [filterFavOnly, setFilterFavOnly] = useState(false);
   const [historyWeek, setHistoryWeek] = useState(null);
   const [addCatModal, setAddCatModal] = useState(false);
@@ -256,8 +368,48 @@ export default function App() {
   const [dragItem, setDragItem] = useState(null);
   const [planView, setPlanView] = useState("weekday");
   const [toast, setToast] = useState(null);
+  const [ratingModal, setRatingModal] = useState(null); // dish to rate
+  const [confirmResetPlan, setConfirmResetPlan] = useState(false);
+  const lastBackPress = useRef(0);
 
   useEffect(() => { save("dark", dark); }, [dark]);
+
+  // ── Android back button ──
+  useEffect(() => {
+    const handleBack = e => {
+      // Check if any modal is open
+      const anyModal = showAddDish||editDish||viewDish||showAddIdea||editIdea||
+        planSlot||historyWeek||addCatModal||ratingModal||confirmResetPlan;
+      if (anyModal) {
+        e.preventDefault();
+        // Close topmost modal
+        if (confirmResetPlan) { setConfirmResetPlan(false); return; }
+        if (ratingModal) { setRatingModal(null); return; }
+        if (addCatModal) { setAddCatModal(false); return; }
+        if (historyWeek) { setHistoryWeek(null); return; }
+        if (planSlot) { setPlanSlot(null); setPendingDishForPlan(null); setSelectedSlots([]); return; }
+        if (editIdea) { setEditIdea(null); return; }
+        if (showAddIdea) { setShowAddIdea(false); return; }
+        if (viewDish) { setViewDish(null); return; }
+        if (editDish) { setEditDish(null); return; }
+        if (showAddDish) { setShowAddDish(false); return; }
+      } else {
+        // No modal open — double tap to exit
+        const now = Date.now();
+        if (now - lastBackPress.current < 2000) {
+          // Allow natural back (exit)
+          return;
+        }
+        e.preventDefault();
+        lastBackPress.current = now;
+        showToastMsg("Appuie à nouveau sur Retour pour quitter");
+      }
+    };
+    window.addEventListener("popstate", handleBack);
+    // Push a dummy state so popstate fires on back press
+    window.history.pushState(null, "", window.location.href);
+    return () => window.removeEventListener("popstate", handleBack);
+  }, [showAddDish,editDish,viewDish,showAddIdea,editIdea,planSlot,historyWeek,addCatModal,ratingModal,confirmResetPlan]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, user => {
@@ -270,12 +422,10 @@ export default function App() {
     if (!authUser) { setDataLoading(false); return; }
     setDataLoading(true);
     const u = [];
-    u.push(onSnapshot(collection(db,"dishes"), s => setDishes(s.docs.map(d=>({id:d.id,...d.data()})))));
-    u.push(onSnapshot(collection(db,"ideas"), s => setIdeas(s.docs.map(d=>({id:d.id,...d.data()})))));
-    u.push(onSnapshot(doc(db,"config","categories"), s => { if(s.exists()) setCategories(s.data().list||DEFAULT_CATEGORIES); }));
-    u.push(onSnapshot(collection(db,"weekPlans"), s => {
-      const p={}; s.docs.forEach(d=>{p[d.id]=d.data();}); setWeekPlans(p); setDataLoading(false);
-    }));
+    u.push(onSnapshot(collection(db,"dishes"), s=>setDishes(s.docs.map(d=>({id:d.id,...d.data()})))));
+    u.push(onSnapshot(collection(db,"ideas"), s=>setIdeas(s.docs.map(d=>({id:d.id,...d.data()})))));
+    u.push(onSnapshot(doc(db,"config","categories"), s=>{ if(s.exists()) setCategories(s.data().list||DEFAULT_CATEGORIES); }));
+    u.push(onSnapshot(collection(db,"weekPlans"), s=>{ const p={}; s.docs.forEach(d=>{p[d.id]=d.data();}); setWeekPlans(p); setDataLoading(false); }));
     u.push(onSnapshot(query(collection(db,"activity"),orderBy("ts","desc"),limit(50)), s=>setActivityFeed(s.docs.map(d=>({id:d.id,...d.data()})))));
     return () => u.forEach(f=>f());
   }, [authUser]);
@@ -293,71 +443,70 @@ export default function App() {
 
   const logActivity = useCallback(async msg => {
     if (!currentUser) return;
-    try { await addDoc(collection(db,"activity"), {user:currentUser, msg, ts:serverTimestamp()}); } catch {}
+    try { await addDoc(collection(db,"activity"),{user:currentUser,msg,ts:serverTimestamp()}); } catch {}
   }, [currentUser]);
 
   const setCurrentWeekPlan = useCallback(async plan => {
     await setDoc(doc(db,"weekPlans",currentWeekKey), plan);
   }, [currentWeekKey]);
 
-  const showToast = useCallback((msg, onUndo) => {
-    setToast(prev => { if (prev?.timer) clearTimeout(prev.timer); return null; });
-    const timer = setTimeout(() => setToast(null), 6000);
-    setToast({ msg, onUndo, timer });
+  // Simple toast (no undo)
+  const showToastMsg = useCallback((msg) => {
+    setToast(prev=>{if(prev?.timer)clearTimeout(prev.timer);return null;});
+    const timer = setTimeout(()=>setToast(null), 3000);
+    setToast({msg, timer, onUndo:null});
   }, []);
 
-  const avgTaste = d => { const v=Object.values(d.tasteByUser||{}).filter(Boolean); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; };
+  // Toast with undo
+  const showToast = useCallback((msg, onUndo) => {
+    setToast(prev=>{if(prev?.timer)clearTimeout(prev.timer);return null;});
+    const timer = setTimeout(()=>setToast(null), 6000);
+    setToast({msg, onUndo, timer});
+  }, []);
+
+  const avgTaste = d => { const v=Object.values(d.tasteByUser||{}).filter(Boolean); return v.length?v.reduce((a,b)=>a+b,0)/v.length:0; };
 
   const filteredDishes = useMemo(() => dishes.filter(d => {
     if (searchQ && !d.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
     if (filterCat && !(d.categories||[]).includes(filterCat)) return false;
     if (filterFavOnly && !d.favorite) return false;
-    if (filterMinTaste > 0 && avgTaste(d) < filterMinTaste) return false;
     return true;
-  }), [dishes, searchQ, filterCat, filterFavOnly, filterMinTaste]);
+  }), [dishes, searchQ, filterCat, filterFavOnly]);
 
   const saveDish = async (form, isEdit) => {
     const payload = {...form, updatedBy:currentUser, updatedAt:serverTimestamp()};
-    if (isEdit) { await updateDoc(doc(db,"dishes",form.id), payload); logActivity(`a modifié "${form.name}"`); }
-    else { delete payload.id; payload.createdBy=currentUser; payload.createdAt=serverTimestamp(); await addDoc(collection(db,"dishes"), payload); logActivity(`a ajouté "${form.name}"`); }
+    if (isEdit) { await updateDoc(doc(db,"dishes",form.id),payload); logActivity(`a modifié "${form.name}"`); }
+    else { delete payload.id; payload.createdBy=currentUser; payload.createdAt=serverTimestamp(); await addDoc(collection(db,"dishes"),payload); logActivity(`a ajouté "${form.name}"`); }
     setShowAddDish(false); setEditDish(null);
   };
 
   const deleteDish = async (id, name) => {
-    const snap = dishes.find(d => d.id === id);
+    const snap = dishes.find(d=>d.id===id);
     if (!snap) return;
     await deleteDoc(doc(db,"dishes",id));
-    Object.keys(weekPlans).forEach(wk => {
-      const plan = {...weekPlans[wk]}; let changed = false;
-      Object.keys(plan).forEach(slot => { if (plan[slot]?.id===id) { plan[slot]=null; changed=true; } });
-      if (changed) setDoc(doc(db,"weekPlans",wk), plan);
-    });
+    Object.keys(weekPlans).forEach(wk=>{ const plan={...weekPlans[wk]}; let ch=false; Object.keys(plan).forEach(slot=>{if(plan[slot]?.id===id){plan[slot]=null;ch=true;}}); if(ch)setDoc(doc(db,"weekPlans",wk),plan); });
     logActivity(`a supprimé "${name}"`);
-    showToast(`"${name}" supprimé`, async () => {
-      const {id:_id, ...data} = snap;
-      await addDoc(collection(db,"dishes"), {...data, updatedBy:currentUser, updatedAt:serverTimestamp()});
-      logActivity(`a restauré "${name}"`);
-    });
+    showToast(`"${name}" supprimé`, async()=>{ const{id:_id,...data}=snap; await addDoc(collection(db,"dishes"),{...data,updatedBy:currentUser,updatedAt:serverTimestamp()}); logActivity(`a restauré "${name}"`); });
   };
 
-  const toggleFav = async dish => { await updateDoc(doc(db,"dishes",dish.id), {favorite:!dish.favorite, updatedBy:currentUser, updatedAt:serverTimestamp()}); };
+  const toggleFav = async dish => { await updateDoc(doc(db,"dishes",dish.id),{favorite:!dish.favorite,updatedBy:currentUser,updatedAt:serverTimestamp()}); };
 
   const updateTaste = async (dish, value) => {
-    const tasteByUser = {...(dish.tasteByUser||{}), [currentUser]:value};
-    await updateDoc(doc(db,"dishes",dish.id), {tasteByUser, updatedBy:currentUser, updatedAt:serverTimestamp()});
-    if (viewDish?.id===dish.id) setViewDish(d=>({...d,tasteByUser}));
+    const tasteByUser={...(dish.tasteByUser||{}),[currentUser]:value};
+    await updateDoc(doc(db,"dishes",dish.id),{tasteByUser,updatedBy:currentUser,updatedAt:serverTimestamp()});
+    if(viewDish?.id===dish.id) setViewDish(d=>({...d,tasteByUser}));
   };
 
   const assignDish = async (dish, slot) => {
-    await setCurrentWeekPlan({...currentWeekPlan, [slot]:{id:dish.id,name:dish.name,photo:dish.thumbnail||dish.photo||null}});
+    await setCurrentWeekPlan({...currentWeekPlan,[slot]:{id:dish.id,name:dish.name,photo:dish.thumbnail||dish.photo||null}});
     logActivity(`a planifié "${dish.name}" (${slot})`);
     setPlanSlot(null); setPendingDishForPlan(null);
   };
 
   const assignDishToMultipleSlots = async (dish, slots) => {
     if (!slots.length) return;
-    const plan = {...currentWeekPlan};
-    slots.forEach(slot => { plan[slot]={id:dish.id,name:dish.name,photo:dish.thumbnail||dish.photo||null}; });
+    const plan={...currentWeekPlan};
+    slots.forEach(slot=>{plan[slot]={id:dish.id,name:dish.name,photo:dish.thumbnail||dish.photo||null};});
     await setCurrentWeekPlan(plan);
     logActivity(`a planifié "${dish.name}" sur ${slots.length} créneau${slots.length>1?"x":""}`);
     setPlanSlot(null); setPendingDishForPlan(null); setSelectedSlots([]);
@@ -367,20 +516,26 @@ export default function App() {
 
   const handleDrop = async targetSlot => {
     if (!dragItem) return;
-    const plan = {...currentWeekPlan};
+    const plan={...currentWeekPlan};
     plan[targetSlot]=dragItem.dish; plan[dragItem.slot]=currentWeekPlan[targetSlot]||null;
     await setCurrentWeekPlan(plan);
     logActivity(`a déplacé "${dragItem.dish?.name}" → ${targetSlot}`);
     setDragItem(null);
   };
 
+  const resetPlanning = async () => {
+    await setCurrentWeekPlan(makeEmptyWeek());
+    logActivity("a remis le planning à zéro");
+    setConfirmResetPlan(false);
+  };
+
   const saveIdea = async (form, isEdit) => {
-    if (isEdit) { await updateDoc(doc(db,"ideas",form.id), {...form, updatedAt:serverTimestamp()}); }
-    else { const {id:_id,...rest}=form; await addDoc(collection(db,"ideas"), {...rest, createdBy:currentUser, createdAt:serverTimestamp()}); logActivity(`a ajouté l'idée "${form.title}"`); }
+    if (isEdit) { await updateDoc(doc(db,"ideas",form.id),{...form,updatedAt:serverTimestamp()}); }
+    else { const{id:_id,...rest}=form; await addDoc(collection(db,"ideas"),{...rest,createdBy:currentUser,createdAt:serverTimestamp()}); logActivity(`a ajouté l'idée "${form.title}"`); }
     setShowAddIdea(false); setEditIdea(null);
   };
 
-  const addCategory = async name => { const l=[...categories,name]; await setDoc(doc(db,"config","categories"),{list:l}); };
+  const addCategory = async name => { await setDoc(doc(db,"config","categories"),{list:[...categories,name]}); };
   const drawRandom = () => { const pool=dishes.filter(d=>(!randomFilters.category||(d.categories||[]).includes(randomFilters.category))&&avgTaste(d)>=randomFilters.minTaste&&d.timeRating<=randomFilters.maxTime&&d.dishesRating<=randomFilters.maxDishes); setRandomResult(pool.length?pool[Math.floor(Math.random()*pool.length)]:null); };
 
   const computeStats = useMemo(() => {
@@ -409,6 +564,7 @@ export default function App() {
     primary:{background:T.accent,color:"white",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:600,fontSize:14,cursor:"pointer",fontFamily:"inherit"},
     green:{background:T.green,color:"white",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:600,fontSize:14,cursor:"pointer",fontFamily:"inherit"},
     ghost:{background:"transparent",color:T.textMuted,border:`1.5px solid ${T.inputBorder}`,borderRadius:10,padding:"10px 18px",fontWeight:500,fontSize:14,cursor:"pointer",fontFamily:"inherit"},
+    danger:{background:T.danger,color:"white",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:600,fontSize:14,cursor:"pointer",fontFamily:"inherit"},
     iconBtn:{background:"transparent",border:"none",cursor:"pointer",fontSize:15,padding:"4px 6px",borderRadius:6,color:T.textMuted,lineHeight:1},
   };
 
@@ -444,41 +600,17 @@ export default function App() {
     </div>
   );
 
-  const DishCard=({dish,compact,onSelect})=>{
+  const CompactDishCard=({dish,onSelect})=>{
     const thumb=dish.thumbnail||dish.photo;
-    const avg=avgTaste(dish);
     const cats=dish.categories||[];
     return (
-      <div onClick={onSelect?()=>onSelect(dish):()=>setViewDish(dish)} style={{...s.card,display:"flex",gap:12,alignItems:"flex-start",cursor:"pointer",borderColor:dish.favorite?T.accent:T.cardBorder}}>
-        <div style={{width:compact?44:58,height:compact?44:58,borderRadius:12,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:compact?20:26,flexShrink:0,overflow:"hidden"}}>
+      <div onClick={()=>onSelect(dish)} style={{...s.card,display:"flex",gap:12,alignItems:"center",cursor:"pointer"}}>
+        <div style={{width:44,height:44,borderRadius:10,background:T.accentLight,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
           {thumb?<img src={thumb} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
         </div>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-            <div style={{flex:1}}>
-              <div style={{fontWeight:700,fontSize:compact?13:15,color:T.text,display:"flex",alignItems:"center",gap:6,marginBottom:4}}>{dish.name}{dish.favorite&&<span style={{color:"#f59e0b",fontSize:13}}>★</span>}</div>
-              {!compact&&cats.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>{cats.map(cat=>{const c=catColor(cat);return <span key={cat} style={{fontSize:10,fontWeight:700,color:c.color,background:c.bg,borderRadius:10,padding:"2px 8px"}}>{cat}</span>;})}</div>}
-            </div>
-            {!compact&&<div style={{display:"flex",gap:2,flexShrink:0}}>
-              <button onClick={e=>{e.stopPropagation();toggleFav(dish);}} style={{...s.iconBtn,color:dish.favorite?"#f59e0b":T.textLight,fontSize:17}}>{dish.favorite?"★":"☆"}</button>
-              <button onClick={e=>{e.stopPropagation();setEditDish(dish);}} style={s.iconBtn}>✏️</button>
-              <button onClick={e=>{e.stopPropagation();deleteDish(dish.id,dish.name);}} style={s.iconBtn}>🗑️</button>
-            </div>}
-          </div>
-          {!compact&&<>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-              <StarRating icon="★" value={dish.tasteByUser?.[currentUser]||0} max={5} color="#f59e0b" size={14}/>
-              <span style={{fontSize:11,color:T.textLight}}>{avg>0?`moy. ${avg.toFixed(1)}`:"pas encore noté"}</span>
-            </div>
-            <div style={{display:"flex",gap:10}}>
-              <StarRating icon="🍽️" value={dish.dishesRating||0} max={5} color={T.accent} size={13}/>
-              <StarRating icon="⏱️" value={dish.timeRating||0} max={5} color={T.green} size={13}/>
-            </div>
-            <div style={{marginTop:6,fontSize:11,color:T.textLight,display:"flex",alignItems:"center",gap:4}}>
-              <Avatar user={dish.updatedBy} size={14}/>{dish.updatedBy} · {formatTimeAgo(dish.updatedAt)}
-            </div>
-          </>}
-          {compact&&cats.length>0&&<div style={{fontSize:10,color:T.textMuted}}>{cats.join(", ")}</div>}
+          <div style={{fontWeight:600,fontSize:13,color:T.text}}>{dish.name}</div>
+          {cats.length>0&&<div style={{fontSize:10,color:T.textMuted}}>{cats.join(", ")}</div>}
         </div>
       </div>
     );
@@ -596,6 +728,7 @@ export default function App() {
 
   return (
     <div style={s.app}>
+      {/* HEADER */}
       <div style={{background:T.headerBg,padding:"18px 20px 14px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
@@ -610,35 +743,62 @@ export default function App() {
         {computeStats.missingSlots.length>0&&<div style={{marginTop:12,background:"rgba(255,255,255,0.15)",borderRadius:10,padding:"8px 12px",fontSize:12,color:"rgba(255,255,255,0.9)"}}>💡 Il manque encore <strong>{computeStats.missingSlots.length}</strong> créneau{computeStats.missingSlots.length>1?"x":""} à planifier cette semaine</div>}
       </div>
 
+      {/* TABS */}
       <div style={{display:"flex",background:T.navBg,borderBottom:`1px solid ${T.cardBorder}`,overflowX:"auto"}}>
         {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,minWidth:50,padding:"10px 2px",border:"none",background:"transparent",fontFamily:"inherit",fontWeight:tab===t.id?700:400,color:tab===t.id?T.accent:T.textMuted,fontSize:10,borderBottom:`2.5px solid ${tab===t.id?T.accent:"transparent"}`,marginBottom:-1,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}><span style={{fontSize:16}}>{t.icon}</span>{t.label}</button>)}
       </div>
 
+      {/* CONTENT */}
       <div style={{flex:1,padding:16,paddingBottom:36}}>
 
+        {/* ══ PLATS ══ */}
         {tab==="dishes"&&<div>
           <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="🔍 Rechercher un plat..." style={{...s.input,marginBottom:10}}/>
-          <div style={{display:"flex",gap:6,marginBottom:10,overflowX:"auto",paddingBottom:2}}>
+
+          {/* Filtres par catégorie — boutons */}
+          <div style={{display:"flex",gap:6,marginBottom:10,overflowX:"auto",paddingBottom:4}}>
             <button onClick={()=>setFilterFavOnly(f=>!f)} style={{...s.ghost,fontSize:12,padding:"5px 11px",whiteSpace:"nowrap",borderColor:filterFavOnly?"#f59e0b":T.inputBorder,color:filterFavOnly?"#f59e0b":T.textMuted,flexShrink:0}}>★ Favoris</button>
-            <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{...s.input,width:"auto",fontSize:12,padding:"5px 10px",flexShrink:0}}><option value="">Toutes catégories</option>{categories.map(c=><option key={c}>{c}</option>)}</select>
-            {[0,3,4,5].map(v=><button key={v} onClick={()=>setFilterMinTaste(filterMinTaste===v?0:v)} style={{...s.ghost,fontSize:12,padding:"5px 10px",whiteSpace:"nowrap",borderColor:filterMinTaste===v?"#f59e0b":T.inputBorder,color:filterMinTaste===v?"#f59e0b":T.textMuted,flexShrink:0}}>{v===0?"Tous":`≥ ${"★".repeat(v)}`}</button>)}
+            <button onClick={()=>setFilterCat("")} style={{...s.ghost,fontSize:12,padding:"5px 11px",whiteSpace:"nowrap",borderColor:filterCat===""?T.accent:T.inputBorder,color:filterCat===""?T.accent:T.textMuted,flexShrink:0}}>Tous</button>
+            {categories.map(cat=>{const active=filterCat===cat;const c=catColor(cat);return <button key={cat} onClick={()=>setFilterCat(active?"":cat)} style={{fontSize:12,padding:"5px 11px",whiteSpace:"nowrap",borderRadius:10,cursor:"pointer",border:`1.5px solid ${active?c.color:T.inputBorder}`,background:active?c.bg:"transparent",color:active?c.color:T.textMuted,flexShrink:0,fontFamily:"inherit",fontWeight:active?700:400}}>{cat}</button>;})}
           </div>
+
           <button onClick={()=>setShowAddDish(true)} style={{...s.primary,width:"100%",padding:12,marginBottom:14}}>+ Ajouter un plat</button>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {filteredDishes.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"40px 0"}}>Aucun plat trouvé 🍽️</div>}
-            {filteredDishes.map(d=><DishCard key={d.id} dish={d}/>)}
+
+          {/* Astuce swipe — hint discret */}
+          <div style={{fontSize:11,color:T.textLight,textAlign:"center",marginBottom:10}}>
+            ← favori &nbsp;|&nbsp; appui long = noter &nbsp;|&nbsp; planifier →
+          </div>
+
+          {/* Grille 2 colonnes */}
+          {filteredDishes.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"40px 0"}}>Aucun plat trouvé 🍽️</div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {filteredDishes.map(d=>(
+              <SwipeCard key={d.id} dish={d} T={T} catColor={catColor}
+                onTap={dish=>setViewDish(dish)}
+                onSwipeRight={dish=>{ setPendingDishForPlan(dish); setPlanSlot("__pick__"); setSelectedSlots([]); }}
+                onSwipeLeft={dish=>toggleFav(dish)}
+                onLongPress={dish=>setRatingModal(dish)}
+              />
+            ))}
           </div>
         </div>}
 
+        {/* ══ PLANNING ══ */}
         {tab==="plan"&&<div>
-          <div style={{display:"flex",background:T.segBg,borderRadius:12,padding:3,marginBottom:14,gap:3}}>
-            {[{id:"weekday",label:"Lun → Ven midi",icon:"💼"},{id:"weekend",label:"Ven soir → Dim",icon:"🌿"}].map(v=><button key={v.id} onClick={()=>setPlanView(v.id)} style={{flex:1,padding:"9px 6px",borderRadius:9,border:"none",background:planView===v.id?T.card:"transparent",color:planView===v.id?(v.id==="weekday"?T.weekdayHeader:T.weekendHeader):T.textMuted,fontWeight:planView===v.id?700:400,fontSize:12,cursor:"pointer",fontFamily:"inherit",boxShadow:planView===v.id?`0 2px 8px ${T.shadow}`:"none"}}>{v.icon} {v.label}</button>)}
+          <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
+            <div style={{display:"flex",background:T.segBg,borderRadius:12,padding:3,flex:1,gap:3}}>
+              {[{id:"weekday",label:"Lun → Ven midi",icon:"💼"},{id:"weekend",label:"Ven soir → Dim",icon:"🌿"}].map(v=><button key={v.id} onClick={()=>setPlanView(v.id)} style={{flex:1,padding:"9px 6px",borderRadius:9,border:"none",background:planView===v.id?T.card:"transparent",color:planView===v.id?(v.id==="weekday"?T.weekdayHeader:T.weekendHeader):T.textMuted,fontWeight:planView===v.id?700:400,fontSize:12,cursor:"pointer",fontFamily:"inherit",boxShadow:planView===v.id?`0 2px 8px ${T.shadow}`:"none"}}>{v.icon} {v.label}</button>)}
+            </div>
+            <button onClick={()=>setConfirmResetPlan(true)} title="Remettre à zéro" style={{background:T.card,border:`1.5px solid ${T.inputBorder}`,borderRadius:10,padding:"8px 10px",cursor:"pointer",fontSize:16,color:T.danger,flexShrink:0}}>🗑️</button>
           </div>
+
           {planView==="weekday"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{Object.entries(weekdayByDay).map(([day,meals])=><div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:T.weekdayBorder}}><div style={{background:T.weekdayHeader,color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div><div style={{display:"grid",gridTemplateColumns:meals.soir?"1fr 1fr":"1fr",padding:8,gap:8}}>{meals.midi&&<PlanSlot slot={meals.midi} isWeekend={false}/>}{meals.soir&&<PlanSlot slot={meals.soir} isWeekend={false}/>}</div></div>)}</div>}
           {planView==="weekend"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{Object.entries(weekendByDay).map(([day,meals])=><div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:T.weekendBorder}}><div style={{background:T.weekendHeader,color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",padding:8,gap:8}}>{meals.midi&&<PlanSlot slot={meals.midi} isWeekend={true}/>}{meals.soir&&<PlanSlot slot={meals.soir} isWeekend={true}/>}</div></div>)}</div>}
+
           {pastWeeks.length>0&&<div style={{marginTop:24}}><div style={{fontWeight:700,color:T.textMuted,fontSize:11,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>📚 Semaines passées</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{pastWeeks.map(wk=><button key={wk} onClick={()=>setHistoryWeek(wk)} style={{...s.card,padding:"10px 14px",textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontWeight:600,color:T.text,fontSize:13}}>Semaine du {wk}</div><div style={{fontSize:11,color:T.textMuted}}>{Object.values(weekPlans[wk]||{}).filter(Boolean).length} repas</div></button>)}</div></div>}
         </div>}
 
+        {/* ══ IDÉES ══ */}
         {tab==="ideas"&&<div>
           <button onClick={()=>setShowAddIdea(true)} style={{...s.green,width:"100%",padding:12,marginBottom:14}}>+ Nouvelle idée de plat</button>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -662,7 +822,7 @@ export default function App() {
                   {!idea.links&&idea.link&&<a href={idea.link} target="_blank" rel="noreferrer" style={{fontSize:12,color:T.accent,display:"block",marginTop:4}}>🔗 Voir la recette</a>}
                   <div style={{display:"flex",gap:8,marginTop:10}}>
                     <button onClick={()=>updateDoc(doc(db,"ideas",idea.id),{tested:!idea.tested})} style={{...s.ghost,fontSize:12,padding:"5px 10px",borderColor:idea.tested?T.green:T.inputBorder,color:idea.tested?T.green:T.textMuted}}>{idea.tested?"✅ Testé":"⏳ À tester"}</button>
-                    <button onClick={()=>{setShowAddDish({fromIdea:idea});}} style={{...s.primary,fontSize:12,padding:"5px 12px"}}>→ Créer ce plat</button>
+                    <button onClick={()=>setShowAddDish({fromIdea:idea})} style={{...s.primary,fontSize:12,padding:"5px 12px"}}>→ Créer ce plat</button>
                   </div>
                 </div>
               </div>
@@ -670,6 +830,7 @@ export default function App() {
           </div>
         </div>}
 
+        {/* ══ ALÉATOIRE ══ */}
         {tab==="random"&&<div>
           <div style={{...s.card,marginBottom:14}}>
             <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:16}}>🎲 Tirer un plat au hasard</div>
@@ -682,20 +843,40 @@ export default function App() {
             </div>
           </div>
           {randomResult===null&&<div style={{textAlign:"center",color:T.textLight,fontSize:14,padding:16}}>Aucun plat ne correspond aux filtres 😅</div>}
-          {randomResult&&<div><div style={{textAlign:"center",fontWeight:700,color:T.accent,marginBottom:10}}>✨ Et ce soir...</div><DishCard dish={randomResult}/><div style={{display:"flex",gap:8,marginTop:10}}><button onClick={drawRandom} style={{...s.ghost,flex:1}}>🔄 Retirer</button><button onClick={()=>{setPendingDishForPlan(randomResult);setPlanSlot("__pick__");setSelectedSlots([]);}} style={{...s.primary,flex:1}}>📅 Planifier</button></div></div>}
+          {randomResult&&<div>
+            <div style={{textAlign:"center",fontWeight:700,color:T.accent,marginBottom:10}}>✨ Et ce soir...</div>
+            <div style={{...s.card,display:"flex",gap:12,alignItems:"center"}}>
+              <div style={{width:60,height:60,borderRadius:12,background:T.accentLight,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>
+                {(randomResult.thumbnail||randomResult.photo)?<img src={randomResult.thumbnail||randomResult.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:16,color:T.text}}>{randomResult.name}</div>
+                <div style={{display:"flex",gap:8,marginTop:4}}>
+                  <StarRating icon="★" value={Math.round(avgTaste(randomResult))} max={5} color="#f59e0b" size={14}/>
+                </div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:10}}>
+              <button onClick={drawRandom} style={{...s.ghost,flex:1}}>🔄 Retirer</button>
+              <button onClick={()=>{setPendingDishForPlan(randomResult);setPlanSlot("__pick__");setSelectedSlots([]);}} style={{...s.primary,flex:1}}>📅 Planifier</button>
+            </div>
+          </div>}
         </div>}
 
+        {/* ══ STATS ══ */}
         {tab==="stats"&&<div>
           <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:16}}>📊 Statistiques</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-            {[{label:"Plats enregistrés",value:dishes.length,icon:"🍽️"},{label:"Repas planifiés",value:computeStats.totalPlanned,icon:"📅"},{label:"Idées en attente",value:ideas.filter(i=>!i.tested).length,icon:"💡"},{label:"Favoris",value:dishes.filter(d=>d.favorite).length,icon:"★"}].map(({label,value,icon})=><div key={label} style={{...s.card,background:lightTheme.statCard,textAlign:"center",padding:"14px 10px"}}><div style={{fontSize:24,marginBottom:4}}>{icon}</div><div style={{fontSize:22,fontWeight:800,color:T.accent}}>{value}</div><div style={{fontSize:11,color:T.textMuted,marginTop:2}}>{label}</div></div>)}
+            {[{label:"Plats enregistrés",value:dishes.length,icon:"🍽️"},{label:"Repas planifiés",value:computeStats.totalPlanned,icon:"📅"},{label:"Idées en attente",value:ideas.filter(i=>!i.tested).length,icon:"💡"},{label:"Favoris",value:dishes.filter(d=>d.favorite).length,icon:"★"}].map(({label,value,icon})=><div key={label} style={{...s.card,background:T.statCard,textAlign:"center",padding:"14px 10px"}}><div style={{fontSize:24,marginBottom:4}}>{icon}</div><div style={{fontSize:22,fontWeight:800,color:T.accent}}>{value}</div><div style={{fontSize:11,color:T.textMuted,marginTop:2}}>{label}</div></div>)}
           </div>
           {computeStats.topDishes.length>0&&<div style={{...s.card,marginBottom:12}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>🏆 Plats les plus cuisinés</div>{computeStats.topDishes.map((d,i)=><div key={d.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:24,height:24,borderRadius:6,background:i===0?"#f59e0b":i===1?T.textMuted:"#cd7f32",display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:11,fontWeight:800,flexShrink:0}}>{i+1}</div><div style={{width:32,height:32,borderRadius:8,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,overflow:"hidden",flexShrink:0}}>{(d.thumbnail||d.photo)?<img src={d.thumbnail||d.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T.text}}>{d.name}</div><div style={{fontSize:11,color:T.textMuted}}>{computeStats.dishCount[d.id]} fois planifié</div></div><StarRating icon="★" value={Math.round(avgTaste(d))} max={5} color="#f59e0b" size={12}/></div>)}</div>}
-          {computeStats.forgottenDishes.length>0&&<div style={{...s.card,marginBottom:12,borderColor:lightTheme.warningBorder,background:dark?darkTheme.warningBg:lightTheme.warningBg}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>⏰ Pas cuisiné depuis +3 semaines</div>{computeStats.forgottenDishes.map(d=><div key={d.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><div style={{fontSize:18}}>🍽️</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T.text}}>{d.name}</div><div style={{fontSize:11,color:T.textMuted}}>Dernier : {computeStats.lastCooked[d.id]?formatDate({toDate:()=>computeStats.lastCooked[d.id]}):"—"}</div></div><button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setTab("plan");}} style={{...s.primary,fontSize:11,padding:"4px 10px"}}>Planifier</button></div>)}</div>}
+          {computeStats.forgottenDishes.length>0&&<div style={{...s.card,marginBottom:12,borderColor:T.warningBorder,background:dark?darkTheme.warningBg:lightTheme.warningBg}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>⏰ Pas cuisiné depuis +3 semaines</div>{computeStats.forgottenDishes.map(d=><div key={d.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><div style={{fontSize:18}}>🍽️</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T.text}}>{d.name}</div><div style={{fontSize:11,color:T.textMuted}}>Dernier : {computeStats.lastCooked[d.id]?formatDate({toDate:()=>computeStats.lastCooked[d.id]}):"—"}</div></div><button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setTab("plan");}} style={{...s.primary,fontSize:11,padding:"4px 10px"}}>Planifier</button></div>)}</div>}
           {computeStats.neverCooked.length>0&&<div style={{...s.card,marginBottom:12}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🆕 Jamais planifiés</div>{computeStats.neverCooked.map(d=><div key={d.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><div style={{fontSize:18}}>🍽️</div><div style={{flex:1,fontSize:13,fontWeight:600,color:T.text}}>{d.name}</div><button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setTab("plan");}} style={{...s.primary,fontSize:11,padding:"4px 10px"}}>Planifier</button></div>)}</div>}
-          {Object.keys(computeStats.catDist).length>0&&<div style={{...s.card}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🗂️ Catégories cette semaine</div>{Object.entries(computeStats.catDist).sort((a,b)=>b[1]-a[1]).map(([cat,count])=>{const c=catColor(cat);const pct=Math.round((count/Math.max(...Object.values(computeStats.catDist)))*100);return <div key={cat} style={{marginBottom:8}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:12,fontWeight:600,color:T.text}}>{cat}</span><span style={{fontSize:11,color:T.textMuted}}>{count} repas</span></div><div style={{height:6,background:T.cardBorder,borderRadius:3,overflow:"hidden"}}><div style={{width:`${pct}%`,height:"100%",background:c.color,borderRadius:3}}/></div></div>;})}</div>}
+          {Object.keys(computeStats.catDist).length>0&&<div style={{...s.card}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🗂️ Catégories cette semaine</div>{Object.entries(computeStats.catDist).sort((a,b)=>b[1]-a[1]).map(([cat,count])=>{const c=catColor(cat);const pct=Math.round((count/Math.max(...Object.values(computeStats.catDist)))*100);return <div key={cat} style={{marginBottom:8}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:12,fontWeight:600,color:T.text}}>{cat}</span><span style={{fontSize:11,color:T.textMuted}}>{count} repas</span></div><div style={{height:6,background:T.cardBorder,borderRadius:3,overflow:"hidden"}}><div style={{width:`${pct}%`,height:"100%",background:c.color,borderRadius:3}}/></div></div>;})}
+          </div>}
         </div>}
 
+        {/* ══ ACTIVITÉ ══ */}
         {tab==="activity"&&<div>
           <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:14}}>📰 Fil d'activité</div>
           {activityFeed.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"40px 0"}}>Aucune activité pour l'instant</div>}
@@ -705,7 +886,8 @@ export default function App() {
         </div>}
       </div>
 
-      {/* MODALS */}
+      {/* ══ MODALS ══ */}
+
       {(showAddDish||editDish)&&<Modal title={editDish?"Modifier le plat":"Nouveau plat"} onClose={()=>{setShowAddDish(false);setEditDish(null);}}>
         <DishForm initial={editDish||(showAddDish?.fromIdea?showAddDish:null)} onSave={form=>saveDish(form,!!editDish)} onCancel={()=>{setShowAddDish(false);setEditDish(null);}}/>
       </Modal>}
@@ -716,7 +898,6 @@ export default function App() {
         const links=d.links||[];
         return <Modal title={d.name} onClose={()=>setViewDish(null)}>
           <div style={{display:"flex",flexDirection:"column",gap:16}}>
-            {/* Photo ENTIÈRE non recadrée */}
             {(d.photo||d.thumbnail)&&<img src={d.photo||d.thumbnail} alt="" style={{width:"100%",borderRadius:14,objectFit:"contain",maxHeight:300,background:T.activityBg}}/>}
             {cats.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4}}>{cats.map(cat=>{const c=catColor(cat);return <span key={cat} style={{fontSize:11,fontWeight:700,color:c.color,background:c.bg,borderRadius:10,padding:"3px 10px"}}>{cat}</span>;})} {d.favorite&&<span style={{fontSize:11,fontWeight:700,color:"#f59e0b",background:"#fef3c7",borderRadius:10,padding:"3px 10px"}}>★ Favori</span>}</div>}
             <div>
@@ -735,15 +916,52 @@ export default function App() {
               <button onClick={()=>{setEditDish(d);setViewDish(null);}} style={{...s.ghost,flex:1}}>✏️ Modifier</button>
               <button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setViewDish(null);}} style={{...s.primary,flex:1}}>📅 Planifier</button>
             </div>
+            <button onClick={()=>{deleteDish(d.id,d.name);setViewDish(null);}} style={{...s.ghost,width:"100%",color:T.danger,borderColor:T.danger}}>🗑️ Supprimer ce plat</button>
           </div>
         </Modal>;
       })()}
+
+      {/* Modale notation rapide (appui long) */}
+      {ratingModal&&(()=>{
+        const d=dishes.find(x=>x.id===ratingModal.id)||ratingModal;
+        const myVal=d.tasteByUser?.[currentUser]||0;
+        return <Modal title={`Noter "${d.name}"`} onClose={()=>setRatingModal(null)}>
+          <div style={{display:"flex",flexDirection:"column",gap:20,alignItems:"center",paddingTop:8}}>
+            <div style={{width:80,height:80,borderRadius:16,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40}}>
+              {(d.thumbnail||d.photo)?<img src={d.thumbnail||d.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+            </div>
+            <div style={{fontSize:15,fontWeight:700,color:T.text}}>{d.name}</div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:11,color:T.textMuted,marginBottom:12,textTransform:"uppercase",letterSpacing:0.5}}>Ta note ({currentUser})</div>
+              <div style={{display:"flex",gap:6,justifyContent:"center"}}>
+                {Array.from({length:5}).map((_,i)=>(
+                  <span key={i} onClick={()=>{updateTaste(d,i+1);setRatingModal(null);}} style={{fontSize:36,cursor:"pointer",opacity:i<myVal?1:0.2,color:"#f59e0b",userSelect:"none",transition:"opacity 0.1s"}}>★</span>
+                ))}
+              </div>
+              {myVal>0&&<div style={{fontSize:13,color:T.textMuted,marginTop:8}}>Ta note actuelle : {myVal}/5</div>}
+            </div>
+            <button onClick={()=>setRatingModal(null)} style={{...s.ghost,width:"100%"}}>Fermer</button>
+          </div>
+        </Modal>;
+      })()}
+
+      {/* Modale confirmation reset planning */}
+      {confirmResetPlan&&<Modal title="Remettre à zéro ?" onClose={()=>setConfirmResetPlan(false)}>
+        <div style={{fontSize:14,color:T.textMuted,marginBottom:20,lineHeight:1.6}}>
+          Tous les plats planifiés pour la semaine en cours seront supprimés. Cette action ne peut pas être annulée.
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>setConfirmResetPlan(false)} style={{...s.ghost,flex:1}}>Annuler</button>
+          <button onClick={resetPlanning} style={{...s.danger,flex:1}}>🗑️ Remettre à zéro</button>
+        </div>
+      </Modal>}
 
       {planSlot==="__pick__"&&pendingDishForPlan&&<Modal title={`Planifier "${pendingDishForPlan.name}"`} onClose={()=>{setPlanSlot(null);setPendingDishForPlan(null);setSelectedSlots([]);}}>
         <div style={{fontSize:13,color:T.textMuted,marginBottom:4}}>Sélectionnez un ou plusieurs créneaux :</div>
         {selectedSlots.length>0&&<div style={{fontSize:12,color:T.accent,fontWeight:600,marginBottom:10}}>{selectedSlots.length} créneau{selectedSlots.length>1?"x":""} sélectionné{selectedSlots.length>1?"s":""}</div>}
         <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:400,overflowY:"auto",marginBottom:14}}>
-          {(()=>{const days={};ALL_SLOTS.forEach(slot=>{const p=slot.split(" ");const meal=p.pop();const day=p.join(" ");if(!days[day])days[day]=[];days[day].push({slot,meal});});return Object.entries(days).map(([day,slots])=><div key={day}><div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,padding:"8px 2px 4px"}}>{day}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{slots.map(({slot,meal})=>{const isSel=selectedSlots.includes(slot);const occ=currentWeekPlan[slot];return <button key={slot} onClick={()=>setSelectedSlots(ss=>isSel?ss.filter(x=>x!==slot):[...ss,slot])} style={{padding:"10px 12px",borderRadius:10,cursor:"pointer",border:`2px solid ${isSel?T.accent:occ?T.inputBorder:T.cardBorder}`,background:isSel?T.accentLight:T.card,fontFamily:"inherit",textAlign:"left",transition:"all 0.15s",display:"flex",flexDirection:"column",gap:3}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:12,fontWeight:700,color:isSel?T.accent:T.text}}>{meal==="midi"?"☀️ Midi":"🌙 Soir"}</span><span style={{fontSize:14,color:isSel?T.accent:T.inputBorder}}>{isSel?"✓":"○"}</span></div><span style={{fontSize:10,color:occ?(isSel?T.accentDark:T.textMuted):T.textLight,fontWeight:occ?600:400}}>{occ?`↩ ${occ.name}`:"Libre"}</span></button>;})}</div></div>);})()}
+          {(()=>{const days={};ALL_SLOTS.forEach(slot=>{const p=slot.split(" ");const meal=p.pop();const day=p.join(" ");if(!days[day])days[day]=[];days[day].push({slot,meal});});return Object.entries(days).map(([day,slots])=><div key={day}><div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,padding:"8px 2px 4px"}}>{day}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{slots.map(({slot,meal})=>{const isSel=selectedSlots.includes(slot);const occ=currentWeekPlan[slot];return <button key={slot} onClick={()=>setSelectedSlots(ss=>isSel?ss.filter(x=>x!==slot):[...ss,slot])} style={{padding:"10px 12px",borderRadius:10,cursor:"pointer",border:`2px solid ${isSel?T.accent:occ?T.inputBorder:T.cardBorder}`,background:isSel?T.accentLight:T.card,fontFamily:"inherit",textAlign:"left",transition:"all 0.15s",display:"flex",flexDirection:"column",gap:3}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:12,fontWeight:700,color:isSel?T.accent:T.text}}>{meal==="midi"?"☀️ Midi":"🌙 Soir"}</span><span style={{fontSize:14,color:isSel?T.accent:T.inputBorder}}>{isSel?"✓":"○"}</span></div><span style={{fontSize:10,color:occ?(isSel?T.accentDark:T.textMuted):T.textLight,fontWeight:occ?600:400}}>{occ?`↩ ${occ.name}`:"Libre"}</span></button>;})}
+          </div></div>);})()}
         </div>
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>{setPlanSlot(null);setPendingDishForPlan(null);setSelectedSlots([]);}} style={{...s.ghost,flex:1}}>Annuler</button>
@@ -754,7 +972,7 @@ export default function App() {
       {planSlot&&planSlot!=="__pick__"&&<Modal title={`Choisir pour : ${planSlot}`} onClose={()=>setPlanSlot(null)}>
         <input placeholder="🔍 Rechercher..." style={{...s.input,marginBottom:10}} onChange={e=>setSearchQ(e.target.value)}/>
         <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:400,overflowY:"auto"}}>
-          {dishes.filter(d=>!searchQ||d.name.toLowerCase().includes(searchQ.toLowerCase())).map(d=><DishCard key={d.id} dish={d} compact onSelect={dish=>assignDish(dish,planSlot)}/>)}
+          {dishes.filter(d=>!searchQ||d.name.toLowerCase().includes(searchQ.toLowerCase())).map(d=><CompactDishCard key={d.id} dish={d} onSelect={dish=>assignDish(dish,planSlot)}/>)}
         </div>
       </Modal>}
 
@@ -778,10 +996,10 @@ export default function App() {
         </div>
       </Modal>}
 
-      {/* TOAST ANNULATION */}
+      {/* TOAST */}
       {toast&&<div style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#1e2d3d",color:"white",borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 4px 24px rgba(0,0,0,0.3)",zIndex:2000,maxWidth:340,width:"calc(100% - 32px)"}}>
         <span style={{flex:1,fontSize:13,fontWeight:500}}>{toast.msg}</span>
-        <button onClick={()=>{if(toast.timer)clearTimeout(toast.timer);toast.onUndo();setToast(null);}} style={{background:T.accent,color:"white",border:"none",borderRadius:8,padding:"6px 14px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>Annuler</button>
+        {toast.onUndo&&<button onClick={()=>{if(toast.timer)clearTimeout(toast.timer);toast.onUndo();setToast(null);}} style={{background:T.accent,color:"white",border:"none",borderRadius:8,padding:"6px 14px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>Annuler</button>}
         <button onClick={()=>{if(toast.timer)clearTimeout(toast.timer);setToast(null);}} style={{background:"transparent",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.5)",fontSize:20,padding:"0 2px",lineHeight:1}}>×</button>
       </div>}
     </div>
