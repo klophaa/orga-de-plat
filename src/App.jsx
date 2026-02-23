@@ -1594,13 +1594,13 @@ export default function App() {
           <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.6)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setViewDish(null)}>
             <div style={{background:T.card,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",overscrollBehavior:"contain",WebkitOverflowScrolling:"touch",boxShadow:`0 -20px 60px ${T.shadowMd}`}} onClick={e=>e.stopPropagation()}>
               {/* Photo plein écran bord à bord + fond flouté */}
-              <div style={{position:"relative",width:"100%",flexShrink:0,height:hasPhoto?260:100,background:hasPhoto?"#111":T.headerBg,overflow:"hidden"}}>
-                {/* Fond flouté ambient — DERRIÈRE tout */}
-                {hasPhoto&&<img src={d.photo||d.thumbnail} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",filter:"blur(20px) brightness(0.45)",transform:"scale(1.2)",zIndex:1,pointerEvents:"none"}}/>}
-                {/* Photo principale bord à bord */}
+              <div style={{position:"relative",width:"100%",flexShrink:0,background:hasPhoto?"#111":T.headerBg,overflow:"hidden"}}>
+                {/* Fond flouté ambient — calé en absolu derrière */}
+                {hasPhoto&&<img src={d.photo||d.thumbnail} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",filter:"blur(22px) brightness(0.45)",transform:"scale(1.2)",zIndex:1,pointerEvents:"none"}}/>}
+                {/* Photo principale — taille naturelle, bord à bord */}
                 {hasPhoto
-                  ? <img src={d.photo||d.thumbnail} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",zIndex:2}}/>
-                  : <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56,zIndex:2}}>🍽️</div>
+                  ? <img src={d.photo||d.thumbnail} alt="" style={{display:"block",width:"100%",height:"auto",position:"relative",zIndex:2}}/>
+                  : <div style={{height:100,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56,position:"relative",zIndex:2}}>🍽️</div>
                 }
                 {/* Dégradé fort en bas pour le titre */}
                 <div style={{position:"absolute",bottom:0,left:0,right:0,height:"55%",background:"linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.3) 60%, transparent 100%)",zIndex:3,pointerEvents:"none"}}/>
