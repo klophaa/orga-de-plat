@@ -100,6 +100,9 @@
 // + Thèmes : affichage en grille 3×2 (au lieu de liste verticale)
 // + Thèmes : 2 nouveaux thèmes — 🌿 Forêt et 🍬 Bonbon (5 thèmes au total)
 // + Onglets : Outils placé avant Suivi
+//
+// ── v10.9 ────────────────────────────────────────────────────────
+// + Outils : minuteur déplacé au-dessus des thèmes couleur
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -1530,6 +1533,34 @@ export default function App() {
         {tab==="tools"&&<div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:4}}>🔧 Outils & Réglages</div>
 
+          {/* ── MINUTEUR ── */}
+          <div style={{...s.card}}>
+            <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>⏱️ Minuteur de cuisson</div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:52,fontWeight:800,color:timerSeconds===0?"#e05c6a":T.accent,fontVariantNumeric:"tabular-nums",letterSpacing:2,marginBottom:8}}>
+                {timerSeconds===null ? formatTimer(timerInitial) : formatTimer(timerSeconds)}
+              </div>
+              {timerSeconds!==null&&timerSeconds!==timerInitial&&<div style={{width:"100%",height:8,background:T.cardBorder,borderRadius:4,overflow:"hidden",marginBottom:14}}>
+                <div style={{width:`${(timerSeconds/timerInitial)*100}%`,height:"100%",background:`linear-gradient(90deg,${T.accent},${T.green})`,borderRadius:4,transition:"width 1s linear"}}/>
+              </div>}
+              {/* Saisie libre mm:ss */}
+              <TimerInput timerInitial={timerInitial} timerRunning={timerRunning} T={T} s={s}
+                onStart={(totalSecs)=>{ setTimerInitial(totalSecs); setTimerSeconds(totalSecs); setTimerRunning(true); }}
+              />
+
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>{setTimerSeconds(timerInitial);setTimerRunning(false);}} style={{...s.ghost,flex:1,fontSize:18}}>↺</button>
+                <button onClick={()=>setTimerRunning(r=>!r)} disabled={timerSeconds===null||timerSeconds===0} className="btn-anim" style={{
+                  ...s.primary,flex:2,fontSize:15,
+                  opacity:(timerSeconds===null||timerSeconds===0)?0.5:1
+                }}>
+                  {timerRunning?"⏸ Pause":"▶ Démarrer"}
+                </button>
+              </div>
+              {timerSeconds===0&&<div style={{marginTop:12,padding:"10px",background:"#fbeaea",borderRadius:10,color:"#e05c6a",fontWeight:700,fontSize:13}}>{"🔔 C'est prêt !"}</div>}
+            </div>
+          </div>
+
           {/* ── THÈMES ── */}
           <div style={{...s.card}}>
             <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>🎨 Thème couleur</div>
@@ -1562,34 +1593,6 @@ export default function App() {
                   background:"white",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"
                 }}/>
               </button>
-            </div>
-          </div>
-
-          {/* ── MINUTEUR ── */}
-          <div style={{...s.card}}>
-            <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>⏱️ Minuteur de cuisson</div>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:52,fontWeight:800,color:timerSeconds===0?"#e05c6a":T.accent,fontVariantNumeric:"tabular-nums",letterSpacing:2,marginBottom:8}}>
-                {timerSeconds===null ? formatTimer(timerInitial) : formatTimer(timerSeconds)}
-              </div>
-              {timerSeconds!==null&&timerSeconds!==timerInitial&&<div style={{width:"100%",height:8,background:T.cardBorder,borderRadius:4,overflow:"hidden",marginBottom:14}}>
-                <div style={{width:`${(timerSeconds/timerInitial)*100}%`,height:"100%",background:`linear-gradient(90deg,${T.accent},${T.green})`,borderRadius:4,transition:"width 1s linear"}}/>
-              </div>}
-              {/* Saisie libre mm:ss */}
-              <TimerInput timerInitial={timerInitial} timerRunning={timerRunning} T={T} s={s}
-                onStart={(totalSecs)=>{ setTimerInitial(totalSecs); setTimerSeconds(totalSecs); setTimerRunning(true); }}
-              />
-
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>{setTimerSeconds(timerInitial);setTimerRunning(false);}} style={{...s.ghost,flex:1,fontSize:18}}>↺</button>
-                <button onClick={()=>setTimerRunning(r=>!r)} disabled={timerSeconds===null||timerSeconds===0} className="btn-anim" style={{
-                  ...s.primary,flex:2,fontSize:15,
-                  opacity:(timerSeconds===null||timerSeconds===0)?0.5:1
-                }}>
-                  {timerRunning?"⏸ Pause":"▶ Démarrer"}
-                </button>
-              </div>
-              {timerSeconds===0&&<div style={{marginTop:12,padding:"10px",background:"#fbeaea",borderRadius:10,color:"#e05c6a",fontWeight:700,fontSize:13}}>{"🔔 C'est prêt !"}</div>}
             </div>
           </div>
 
