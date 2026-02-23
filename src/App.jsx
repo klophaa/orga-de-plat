@@ -1127,7 +1127,7 @@ export default function App() {
 
   if (dataLoading) return <Spinner T={T}/>;
 
-  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},{id:"suivi",icon:"📊",label:"Suivi"},{id:"tools",icon:"🔧",label:"Outils"}];
+  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},{id:"suivi",icon:"🔎",label:"Suivi"},{id:"tools",icon:"🔧",label:"Outils"}];
 
   const CategoryPills=({selected=[],onChange})=>(
     <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -1286,7 +1286,6 @@ export default function App() {
             </div>
           </div>
           <div style={{display:"flex",gap:6}}>
-            <button onClick={()=>setDark(d=>!d)} style={{background:"rgba(255,255,255,0.18)",border:"none",borderRadius:8,padding:"5px 9px",fontSize:15,cursor:"pointer",color:"white"}}>{dark?"☀️":"🌙"}</button>
             <button onClick={()=>signOut(auth)} style={{background:"rgba(255,255,255,0.13)",border:"1px solid rgba(255,255,255,0.28)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer",color:"white",fontFamily:"inherit",fontWeight:600}}>Quitter</button>
           </div>
         </div>
