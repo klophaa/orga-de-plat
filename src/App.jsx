@@ -1161,18 +1161,21 @@ export default function App() {
     return (
       <div onDragOver={e=>{e.preventDefault();setOver(true);}} onDragLeave={()=>setOver(false)} onDrop={e=>{e.preventDefault();setOver(false);handleDrop(slot);}}
         style={{background:over?(isWeekend?T.weekendBg:T.weekdayBg):"transparent",border:`1.5px ${over?"solid":"dashed"} ${over?(isWeekend?T.weekendHeader:T.weekdayHeader):(isWeekend?T.weekendBorder:T.weekdayBorder)}`,borderRadius:10,padding:"8px 10px",minHeight:62,transition:"all 0.15s"}}>
-        <div style={{fontSize:10,fontWeight:700,color:isWeekend?T.weekendHeader:T.weekdayHeader,textTransform:"uppercase",letterSpacing:0.5,marginBottom:5}}>{meal==="midi"?"☀️ Midi":"🌙 Soir"}</div>
+        {/* Label midi/soir */}
+        <div style={{fontSize:10,fontWeight:700,color:isWeekend?T.weekendHeader:T.weekdayHeader,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>{meal==="midi"?"☀️ Midi":"🌙 Soir"}</div>
         {display?(
           <div draggable onDragStart={()=>setDragItem({slot,dish:entry})}>
-            <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{width:56,height:56,borderRadius:11,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,overflow:"hidden",flexShrink:0}}>
-                {(display.photo||display.thumbnail)?<img src={display.thumbnail||display.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
-              </div>
-              <div style={{flex:1,fontSize:12,fontWeight:600,color:T.text,cursor:"grab",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{display.name}</div>
-              <button onClick={()=>removeFromPlan(slot)} style={{...s.iconBtn,fontSize:14,flexShrink:0}}>×</button>
+            {/* Photo pleine largeur */}
+            <div style={{width:"100%",aspectRatio:"4/3",borderRadius:9,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,marginBottom:6}}>
+              {(display.photo||display.thumbnail)?<img src={display.thumbnail||display.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+            </div>
+            {/* Nom + bouton supprimer */}
+            <div style={{display:"flex",alignItems:"center",gap:4}}>
+              <div style={{flex:1,fontSize:12,fontWeight:700,color:T.text,lineHeight:1.3,wordBreak:"break-word"}}>{display.name}</div>
+              <button onClick={()=>removeFromPlan(slot)} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>{"×"}</button>
             </div>
           </div>
-        ):<button onClick={()=>setPlanSlot(slot)} style={{background:"transparent",border:"none",color:T.textLight,fontSize:12,padding:"2px 0",cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"left"}}>+ Assigner</button>}
+        ):<button onClick={()=>setPlanSlot(slot)} style={{background:"transparent",border:"none",color:T.textLight,fontSize:12,padding:"2px 0",cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"left"}}>{"+ Assigner"}</button>}
       </div>
     );
   };
