@@ -63,6 +63,18 @@
 // + ⑮ Compatibilité des goûts Théo & Elodie — dans onglet Outils
 // + Onglet 🔧 Outils ajouté (7ème onglet)
 // + Toggle dark mode déplacé dans Outils (avec beau switch)
+//
+// ── v11 ─────────────────────────────────────────────────────────
+// + Fix photo fiche : flou ambient fonctionnel (zIndex corrects), titre+catégories restaurés
+// + Fix recherche plats : plus de perte de focus à chaque lettre (input non-contrôlé)
+// + Onglet Outils → modale ⚙️ (icône engrenage dans bandeau remplace 🌙)
+// + 5 onglets : Plats, Planning, Idées, Aléatoire, Stats & Actu
+// + Stats et Activité fusionnés
+// + Activité : log de connexion avec heure et date
+// + Planning : miniatures 40×40px (plus grandes)
+// + Minuteur : saisie libre en minutes
+// + Roue : mode sélection manuelle des plats
+// + 6 palettes couleur (+ Forêt 🌲, Cerise 🍒, Minuit 🌌) en grille 3×2
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -116,15 +128,24 @@ const save = (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catc
 
 // ── PALETTES ─────────────────────────────────────────────────────
 const PALETTES = {
-  ocean: { name:"Océan", emoji:"🌊", a:"#4f86c6", b:"#6bab8a",
+  ocean:    { name:"Océan",           emoji:"🌊", a:"#4f86c6", b:"#6bab8a",
     headerBg:"linear-gradient(135deg,#4f86c6 0%,#6bab8a 100%)",
     darkHeaderBg:"linear-gradient(135deg,#305888 0%,#2e6e50 100%)" },
-  sunset: { name:"Coucher de soleil", emoji:"🌅", a:"#e07040", b:"#c0509a",
+  sunset:   { name:"Coucher de soleil",emoji:"🌅", a:"#e07040", b:"#c0509a",
     headerBg:"linear-gradient(135deg,#e07040 0%,#c0509a 100%)",
     darkHeaderBg:"linear-gradient(135deg,#803020 0%,#702060 100%)" },
-  lavender: { name:"Lavande", emoji:"💜", a:"#8b6fd4", b:"#4ab8c8",
+  lavender: { name:"Lavande",          emoji:"💜", a:"#8b6fd4", b:"#4ab8c8",
     headerBg:"linear-gradient(135deg,#8b6fd4 0%,#4ab8c8 100%)",
     darkHeaderBg:"linear-gradient(135deg,#503890 0%,#226878 100%)" },
+  forest:   { name:"Forêt",            emoji:"🌲", a:"#3a8a5a", b:"#8aaa3a",
+    headerBg:"linear-gradient(135deg,#3a8a5a 0%,#8aaa3a 100%)",
+    darkHeaderBg:"linear-gradient(135deg,#1e5030 0%,#4a6010 100%)" },
+  cherry:   { name:"Cerise",           emoji:"🍒", a:"#d03060", b:"#f07040",
+    headerBg:"linear-gradient(135deg,#d03060 0%,#f07040 100%)",
+    darkHeaderBg:"linear-gradient(135deg,#701020 0%,#903020 100%)" },
+  midnight: { name:"Minuit",           emoji:"🌌", a:"#4060c0", b:"#8040c0",
+    headerBg:"linear-gradient(135deg,#4060c0 0%,#8040c0 100%)",
+    darkHeaderBg:"linear-gradient(135deg,#203080 0%,#402080 100%)" },
 };
 
 function buildTheme(palette, dark) {
@@ -432,6 +453,69 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
   );
 }
 
+// ─── COMPAT CARD ────────────────────────────────────────────────────────────────
+function CompatCard({ dishes, T, ALLOWED_EMAILS, avgTaste }) {
+  const users = Object.values(ALLOWED_EMAILS).map(u => u.displayName);
+  const commonDishes = dishes.filter(d => {
+    const ratings = users.map(u => d.tasteByUser?.[u]).filter(v => v != null && v > 0);
+    return ratings.length >= 2;
+  });
+  if (commonDishes.length < 3) return (
+    <div style={{border:`1.5px solid ${T.cardBorder}`,borderRadius:16,padding:16,background:T.card||"transparent"}}>
+      <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:6}}>💑 Compatibilité des goûts</div>
+      <div style={{fontSize:12,color:T.textMuted}}>Notez au moins 3 plats en commun pour voir votre score !</div>
+    </div>
+  );
+  const diffs = commonDishes.map(d => {
+    const r = users.map(u => d.tasteByUser?.[u] || 0);
+    return { dish:d, diff:Math.abs(r[0]-r[1]), avg:(r[0]+r[1])/2 };
+  });
+  const compat = Math.round(100 - ((diffs.reduce((a,x) => a+x.diff, 0) / diffs.length) / 4) * 100);
+  const agree = diffs.filter(x => x.diff <= 1).sort((a,b) => b.avg-a.avg).slice(0,3);
+  const disagree = diffs.filter(x => x.diff >= 2).sort((a,b) => b.diff-a.diff).slice(0,3);
+  return (
+    <div style={{border:`1.5px solid ${T.cardBorder}`,borderRadius:16,padding:16,background:T.card||"transparent"}}>
+      <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:14}}>💑 Compatibilité des goûts</div>
+      <div style={{textAlign:"center",marginBottom:14}}>
+        <div style={{fontSize:44,fontWeight:800,background:`linear-gradient(135deg,${T.accent},${T.green})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{compat}%</div>
+        <div style={{fontSize:12,color:T.textMuted}}>{compat>=80?"Vous avez des goûts très proches 💚":compat>=60?"Quelques différences, mais ça se complète 👍":"Vos goûts divergent souvent 🤔"}</div>
+        <div style={{width:"100%",height:8,background:T.cardBorder,borderRadius:4,overflow:"hidden",marginTop:8}}>
+          <div style={{width:`${compat}%`,height:"100%",background:`linear-gradient(90deg,${T.accent},${T.green})`,borderRadius:4}}/>
+        </div>
+        <div style={{fontSize:11,color:T.textLight,marginTop:4}}>Sur {commonDishes.length} plats notés par les deux</div>
+      </div>
+      {agree.length>0&&(
+        <div style={{marginBottom:10}}>
+          <div style={{fontSize:10,fontWeight:800,color:T.green,textTransform:"uppercase",letterSpacing:0.8,marginBottom:6}}>💚 En accord</div>
+          {agree.map(({dish})=>(
+            <div key={dish.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <div style={{width:28,height:28,borderRadius:7,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,overflow:"hidden",flexShrink:0}}>
+                {(dish.thumbnail||dish.photo)?<img src={dish.thumbnail||dish.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+              </div>
+              <div style={{fontSize:12,color:T.text,flex:1}}>{dish.name}</div>
+              <div style={{fontSize:11,color:T.textMuted}}>{users.map(u=>`${dish.tasteByUser?.[u]||0}`).join(" / ")}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {disagree.length>0&&(
+        <div>
+          <div style={{fontSize:10,fontWeight:800,color:"#e05c6a",textTransform:"uppercase",letterSpacing:0.8,marginBottom:6}}>🤔 Désaccords</div>
+          {disagree.map(({dish})=>(
+            <div key={dish.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <div style={{width:28,height:28,borderRadius:7,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,overflow:"hidden",flexShrink:0}}>
+                {(dish.thumbnail||dish.photo)?<img src={dish.thumbnail||dish.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+              </div>
+              <div style={{fontSize:12,color:T.text,flex:1}}>{dish.name}</div>
+              <div style={{fontSize:11,color:T.textMuted}}>{users.map(u=>`${dish.tasteByUser?.[u]||0}`).join(" / ")}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── APP ─────────────────────────────────────────────────────────────────────
 export default function App() {
   const [dark, setDark] = useState(() => load("dark", false));
@@ -474,6 +558,7 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [ratingModal, setRatingModal] = useState(null); // dish to rate
   const [confirmResetPlan, setConfirmResetPlan] = useState(false);
+  const [showTools, setShowTools] = useState(false);
   const lastBackPress = useRef(0);
   // ── Streak ──
   const [streakCount, setStreakCount] = useState(() => load("streakCount", 0));
@@ -487,6 +572,7 @@ export default function App() {
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [wheelAngle, setWheelAngle] = useState(0);
   const [wheelResult, setWheelResult] = useState(null);
+  const [wheelCustomPool, setWheelCustomPool] = useState(null); // null = mode filtre auto
   const wheelRef = useRef(null);
   // ── Confettis ──
   const [showConfetti, setShowConfetti] = useState(false);
@@ -617,10 +703,31 @@ export default function App() {
     return () => window.removeEventListener("popstate", handleBack);
   }, [showAddDish,editDish,viewDish,showAddIdea,editIdea,planSlot,historyWeek,addCatModal,ratingModal,confirmResetPlan]);
 
+  const prevAuthUser = useRef(null);
   useEffect(() => {
     return onAuthStateChanged(auth, user => {
-      if (user && ALLOWED_EMAILS[user.email]) setAuthUser(user);
-      else { setAuthUser(null); if (user) signOut(auth); }
+      if (user && ALLOWED_EMAILS[user.email]) {
+        const wasLoggedOut = !prevAuthUser.current;
+        prevAuthUser.current = user;
+        setAuthUser(user);
+        if (wasLoggedOut) {
+          // Logger la connexion
+          const uInfo = ALLOWED_EMAILS[user.email];
+          const now = new Date();
+          const timeStr = now.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+          const dateStr = now.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
+          addDoc(collection(db,"activity"),{
+            user: uInfo.displayName,
+            msg: `s'est connecté(e) à ${timeStr} le ${dateStr}`,
+            ts: serverTimestamp(),
+            type: "login"
+          }).catch(()=>{});
+        }
+      } else {
+        prevAuthUser.current = null;
+        setAuthUser(null);
+        if (user) signOut(auth);
+      }
     });
   }, []);
 
@@ -797,7 +904,7 @@ export default function App() {
 
   if (dataLoading) return <Spinner T={T}/>;
 
-  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},{id:"stats",icon:"🏆",label:"Stats"},{id:"activity",icon:"📰",label:"Activité"},{id:"tools",icon:"🔧",label:"Outils"}];
+  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},{id:"stats",icon:"🏆",label:"Stats & Actu"}];
 
   const CategoryPills=({selected=[],onChange})=>(
     <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -835,7 +942,7 @@ export default function App() {
         {display?(
           <div draggable onDragStart={()=>setDragItem({slot,dish:entry})}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{width:26,height:26,borderRadius:7,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,overflow:"hidden",flexShrink:0}}>
+              <div style={{width:40,height:40,borderRadius:9,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,overflow:"hidden",flexShrink:0}}>
                 {(display.photo||display.thumbnail)?<img src={display.thumbnail||display.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
               </div>
               <div style={{flex:1,fontSize:12,fontWeight:600,color:T.text,cursor:"grab",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{display.name}</div>
@@ -956,7 +1063,7 @@ export default function App() {
             </div>
           </div>
           <div style={{display:"flex",gap:6}}>
-            <button onClick={()=>setDark(d=>!d)} style={{background:"rgba(255,255,255,0.18)",border:"none",borderRadius:8,padding:"5px 9px",fontSize:15,cursor:"pointer",color:"white"}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={()=>setShowTools(true)} style={{background:"rgba(255,255,255,0.18)",border:"none",borderRadius:8,padding:"5px 9px",fontSize:15,cursor:"pointer",color:"white"}}>⚙️</button>
             <button onClick={()=>signOut(auth)} style={{background:"rgba(255,255,255,0.13)",border:"1px solid rgba(255,255,255,0.28)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer",color:"white",fontFamily:"inherit",fontWeight:600}}>Quitter</button>
           </div>
         </div>
@@ -995,10 +1102,15 @@ export default function App() {
             <button onClick={()=>setShowAddDish(true)} style={{...s.primary,flex:1,padding:"10px 0",textAlign:"center"}}>+ Ajouter un plat</button>
           </div>
 
-          {/* Barre de recherche (dépliable) */}
+          {/* Barre de recherche (dépliable) — input non-contrôlé pour éviter perte focus */}
           {searchQ!==null&&<div style={{marginBottom:10}}>
-            <input autoFocus value={searchQ} onChange={e=>setSearchQ(e.target.value)}
-              placeholder="Rechercher un plat..." style={{...s.input}}/>
+            <input
+              ref={el=>{ if(el&&searchQ==="") el.focus(); }}
+              defaultValue={searchQ}
+              onChange={e=>setSearchQ(e.target.value)}
+              placeholder="Rechercher un plat..."
+              style={{...s.input}}
+            />
           </div>}
 
           {/* Filtres en grille wrap — sans scroll */}
@@ -1054,7 +1166,7 @@ export default function App() {
         {tab==="ideas"&&<div>
           <button onClick={()=>setShowAddIdea(true)} style={{...s.green,width:"100%",padding:12,marginBottom:14}}>+ Nouvelle idée de plat</button>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {ideas.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"40px 0"}}>Aucune idée pour l'instant 💡</div>}
+            {ideas.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"40px 0"}}>Aucune idée pour l{"'"}instant 💡</div>}
             {ideas.map(idea=><div key={idea.id} style={{...s.card,opacity:idea.tested?0.6:1}}>
               <div style={{display:"flex",gap:10}}>
                 <div style={{width:50,height:50,borderRadius:10,background:T.greenLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,overflow:"hidden",flexShrink:0}}>
@@ -1084,27 +1196,71 @@ export default function App() {
 
         {/* ══ ALÉATOIRE — ROUE ══ */}
         {tab==="random"&&(()=>{
-          const wheelDishes=dishes.filter(d=>{
-            const avg=avgTaste(d);
-            if(randomFilters.category&&!(d.categories||[]).includes(randomFilters.category))return false;
-            if(avg>0&&avg<randomFilters.minTaste)return false;
-            if((d.timeRating||0)>randomFilters.maxTime&&d.timeRating>0)return false;
-            if((d.dishesRating||0)>randomFilters.maxDishes&&d.dishesRating>0)return false;
-            return true;
-          }).slice(0,8);
+          const wheelDishes=wheelCustomPool!==null
+            ? (wheelCustomPool||[]).slice(0,8)
+            : dishes.filter(d=>{
+                const avg=avgTaste(d);
+                if(randomFilters.category&&!(d.categories||[]).includes(randomFilters.category))return false;
+                if(avg>0&&avg<randomFilters.minTaste)return false;
+                if((d.timeRating||0)>randomFilters.maxTime&&d.timeRating>0)return false;
+                if((d.dishesRating||0)>randomFilters.maxDishes&&d.dishesRating>0)return false;
+                return true;
+              }).slice(0,8);
           const segCount=wheelDishes.length||1;
           const segAngle=360/segCount;
           const SEG_COLORS=[T.accent,T.green,"#9b7fd4","#e07040","#4aa8b8","#d97706","#e05c6a","#5a9e78"];
           return <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            {/* Filtres */}
-            <div style={{...s.card}}>
+            {/* Toggle mode filtre / sélection manuelle */}
+            <div style={{display:"flex",background:T.segBg,borderRadius:12,padding:3,gap:3,marginBottom:4}}>
+              <button onClick={()=>setWheelCustomPool(null)} style={{flex:1,padding:"8px",borderRadius:9,border:"none",
+                background:wheelCustomPool===null?T.card:"transparent",
+                color:wheelCustomPool===null?T.accent:T.textMuted,fontWeight:wheelCustomPool===null?700:400,
+                fontSize:12,cursor:"pointer",fontFamily:"inherit",
+                boxShadow:wheelCustomPool===null?`0 2px 8px ${T.shadow}`:"none"}}>
+                🎛️ Filtres auto
+              </button>
+              <button onClick={()=>setWheelCustomPool(p=>p===null?[]:p)} style={{flex:1,padding:"8px",borderRadius:9,border:"none",
+                background:wheelCustomPool!==null?T.card:"transparent",
+                color:wheelCustomPool!==null?T.accent:T.textMuted,fontWeight:wheelCustomPool!==null?700:400,
+                fontSize:12,cursor:"pointer",fontFamily:"inherit",
+                boxShadow:wheelCustomPool!==null?`0 2px 8px ${T.shadow}`:"none"}}>
+                ✋ Choix manuel
+              </button>
+            </div>
+
+            {/* Filtres auto */}
+            {wheelCustomPool===null&&<div style={{...s.card}}>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <div><label style={s.label}>Catégorie</label><select value={randomFilters.category} onChange={e=>setRandomFilters(f=>({...f,category:e.target.value}))} style={s.input}><option value="">Toutes</option>{categories.map(c=><option key={c}>{c}</option>)}</select></div>
                 <div><label style={s.label}>★ Goût minimum : {randomFilters.minTaste}/5</label><input type="range" min={1} max={5} value={randomFilters.minTaste} onChange={e=>setRandomFilters(f=>({...f,minTaste:+e.target.value}))} style={{width:"100%",accentColor:T.accent}}/></div>
                 <div><label style={s.label}>⏱️ Temps max : {randomFilters.maxTime}/5</label><input type="range" min={1} max={5} value={randomFilters.maxTime} onChange={e=>setRandomFilters(f=>({...f,maxTime:+e.target.value}))} style={{width:"100%",accentColor:T.green}}/></div>
                 <div><label style={s.label}>🫧 Vaisselle max : {randomFilters.maxDishes}/5</label><input type="range" min={1} max={5} value={randomFilters.maxDishes} onChange={e=>setRandomFilters(f=>({...f,maxDishes:+e.target.value}))} style={{width:"100%",accentColor:T.teal}}/></div>
               </div>
-            </div>
+            </div>}
+
+            {/* Sélection manuelle */}
+            {wheelCustomPool!==null&&<div style={{...s.card}}>
+              <div style={{fontSize:12,color:T.textMuted,marginBottom:10}}>Sélectionne les plats à mettre sur la roue ({(wheelCustomPool||[]).length} sélectionné{(wheelCustomPool||[]).length>1?"s":""}, max 8)</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:220,overflowY:"auto"}}>
+                {dishes.map(d=>{
+                  const sel=(wheelCustomPool||[]).some(x=>x.id===d.id);
+                  return <button key={d.id} onClick={()=>{
+                    if(sel) setWheelCustomPool(p=>(p||[]).filter(x=>x.id!==d.id));
+                    else if((wheelCustomPool||[]).length<8) setWheelCustomPool(p=>[...(p||[]),d]);
+                  }} style={{
+                    display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:10,
+                    border:`1.5px solid ${sel?T.accent:T.inputBorder}`,
+                    background:sel?T.accentLight:T.bg,cursor:"pointer",fontFamily:"inherit",textAlign:"left"
+                  }}>
+                    <div style={{width:30,height:30,borderRadius:7,background:T.accentLight,overflow:"hidden",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
+                      {(d.thumbnail||d.photo)?<img src={d.thumbnail||d.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+                    </div>
+                    <div style={{flex:1,fontSize:12,fontWeight:600,color:T.text}}>{d.name}</div>
+                    {sel&&<div style={{color:T.accent,fontSize:14}}>✓</div>}
+                  </button>;
+                })}
+              </div>
+            </div>}
             {wheelDishes.length===0&&<div style={{textAlign:"center",color:T.textLight,fontSize:14,padding:24}}>Aucun plat ne correspond aux filtres 😅</div>}
             {wheelDishes.length>0&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
               {/* Pointeur + Roue */}
@@ -1140,7 +1296,7 @@ export default function App() {
                 {wheelSpinning?"🌀 En train de tourner…":"🎰 Tourner la roue !"}
               </button>
               {wheelResult&&!wheelSpinning&&<div style={{...s.card,width:"100%",border:`2px solid ${T.accent}`}}>
-                <div style={{textAlign:"center",fontWeight:800,fontSize:13,color:T.accent,marginBottom:10}}>✨ Ce soir c'est...</div>
+                <div style={{textAlign:"center",fontWeight:800,fontSize:13,color:T.accent,marginBottom:10}}>✨ Ce soir c{"'"}est...</div>
                 <div style={{display:"flex",gap:12,alignItems:"center"}}>
                   <div style={{width:56,height:56,borderRadius:12,background:T.accentLight,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>
                     {(wheelResult.thumbnail||wheelResult.photo)?<img src={wheelResult.thumbnail||wheelResult.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
@@ -1204,141 +1360,112 @@ export default function App() {
           {computeStats.topDishes.length>0&&<div style={{...s.card,marginBottom:12}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>🏆 Plats les plus cuisinés</div>{computeStats.topDishes.map((d,i)=><div key={d.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:24,height:24,borderRadius:6,background:i===0?"#f59e0b":i===1?T.textMuted:"#cd7f32",display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:11,fontWeight:800,flexShrink:0}}>{i+1}</div><div style={{width:32,height:32,borderRadius:8,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,overflow:"hidden",flexShrink:0}}>{(d.thumbnail||d.photo)?<img src={d.thumbnail||d.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T.text}}>{d.name}</div><div style={{fontSize:11,color:T.textMuted}}>{computeStats.dishCount[d.id]} fois planifié</div></div><StarRating icon="★" value={Math.round(avgTaste(d))} max={5} color="#f59e0b" size={12}/></div>)}</div>}
           {computeStats.forgottenDishes.length>0&&<div style={{...s.card,marginBottom:12,borderColor:T.warningBorder,background:dark?darkTheme.warningBg:lightTheme.warningBg}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>⏰ Pas cuisiné depuis +3 semaines</div>{computeStats.forgottenDishes.map(d=><div key={d.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><div style={{fontSize:18}}>🍽️</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:T.text}}>{d.name}</div><div style={{fontSize:11,color:T.textMuted}}>Dernier : {computeStats.lastCooked[d.id]?formatDate({toDate:()=>computeStats.lastCooked[d.id]}):"—"}</div></div><button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setTab("plan");}} style={{...s.primary,fontSize:11,padding:"4px 10px"}}>Planifier</button></div>)}</div>}
           {computeStats.neverCooked.length>0&&<div style={{...s.card,marginBottom:12}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🆕 Jamais planifiés</div>{computeStats.neverCooked.map(d=><div key={d.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><div style={{fontSize:18}}>🍽️</div><div style={{flex:1,fontSize:13,fontWeight:600,color:T.text}}>{d.name}</div><button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setTab("plan");}} style={{...s.primary,fontSize:11,padding:"4px 10px"}}>Planifier</button></div>)}</div>}
-          {Object.keys(computeStats.catDist).length>0&&<div style={{...s.card}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🗂️ Catégories cette semaine</div>{Object.entries(computeStats.catDist).sort((a,b)=>b[1]-a[1]).map(([cat,count])=>{const c=catColor(cat);const pct=Math.round((count/Math.max(...Object.values(computeStats.catDist)))*100);return <div key={cat} style={{marginBottom:8}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:12,fontWeight:600,color:T.text}}>{cat}</span><span style={{fontSize:11,color:T.textMuted}}>{count} repas</span></div><div style={{height:6,background:T.cardBorder,borderRadius:3,overflow:"hidden"}}><div style={{width:`${pct}%`,height:"100%",background:c.color,borderRadius:3}}/></div></div>;})}
+          {Object.keys(computeStats.catDist).length>0&&<div style={{...s.card,marginBottom:12}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🗂️ Catégories cette semaine</div>{Object.entries(computeStats.catDist).sort((a,b)=>b[1]-a[1]).map(([cat,count])=>{const c=catColor(cat);const pct=Math.round((count/Math.max(...Object.values(computeStats.catDist)))*100);return <div key={cat} style={{marginBottom:8}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:12,fontWeight:600,color:T.text}}>{cat}</span><span style={{fontSize:11,color:T.textMuted}}>{count} repas</span></div><div style={{height:6,background:T.cardBorder,borderRadius:3,overflow:"hidden"}}><div style={{width:`${pct}%`,height:"100%",background:c.color,borderRadius:3}}/></div></div>;})}
           </div>}
-        </div>}
-
-        {/* ══ ACTIVITÉ ══ */}
-        {tab==="activity"&&<div>
-          <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:14}}>📰 Fil d'activité</div>
-          {activityFeed.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"40px 0"}}>Aucune activité pour l'instant</div>}
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {activityFeed.map(a=><div key={a.id} style={{...s.card,display:"flex",gap:10,alignItems:"center"}}><Avatar user={a.user} size={34}/><div style={{flex:1}}><div style={{fontSize:13,color:T.text}}><strong style={{color:Object.values(ALLOWED_EMAILS).find(u=>u.displayName===a.user)?.color}}>{a.user}</strong> {a.msg}</div><div style={{fontSize:11,color:T.textLight,marginTop:2}}>{formatTimeAgo(a.ts)}</div></div></div>)}
-          </div>
-        </div>}
-
-        {/* ══ OUTILS ══ */}
-        {tab==="tools"&&<div style={{display:"flex",flexDirection:"column",gap:14}}>
-          <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:4}}>🔧 Outils & Réglages</div>
-
-          {/* ── THÈMES ── */}
+          {/* FIL D'ACTIVITÉ intégré */}
           <div style={{...s.card}}>
-            <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>🎨 Thème couleur</div>
+            <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>📰 Fil d{"'"}activité</div>
+            {activityFeed.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"20px 0",fontSize:13}}>Aucune activité pour l{"'"}instant</div>}
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {Object.entries(PALETTES).map(([key,p])=>(
-                <button key={key} onClick={()=>setPalette(key)} style={{
-                  display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:12,
-                  border:`2px solid ${palette===key?T.accent:T.cardBorder}`,
-                  background:palette===key?T.accentLight:T.bg,
-                  cursor:"pointer",fontFamily:"inherit",textAlign:"left"
-                }}>
-                  <div style={{width:36,height:36,borderRadius:10,background:p.headerBg,flexShrink:0}}/>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{p.emoji} {p.name}</div>
+              {activityFeed.map(a=><div key={a.id} style={{display:"flex",gap:10,alignItems:"center",padding:"6px 0",borderBottom:`1px solid ${T.cardBorder}`}}>
+                <Avatar user={a.user} size={30}/>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,color:T.text}}>
+                    <strong style={{color:Object.values(ALLOWED_EMAILS).find(u=>u.displayName===a.user)?.color}}>{a.user}</strong> {a.msg}
                   </div>
-                  {palette===key&&<div style={{fontSize:16,color:T.accent}}>✓</div>}
-                </button>
-              ))}
-            </div>
-            <div style={{marginTop:12,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:12,background:T.bg,border:`1.5px solid ${T.cardBorder}`}}>
-              <div>
-                <div style={{fontSize:13,fontWeight:700,color:T.text}}>🌙 Mode sombre</div>
-                <div style={{fontSize:11,color:T.textMuted}}>Interface sombre</div>
-              </div>
-              <button onClick={()=>setDark(d=>!d)} style={{
-                width:46,height:26,borderRadius:13,border:"none",cursor:"pointer",position:"relative",
-                background:dark?"#4f86c6":"#ccd9e6",transition:"background 0.2s"
-              }}>
-                <div style={{
-                  position:"absolute",top:3,left:dark?22:3,width:20,height:20,borderRadius:10,
-                  background:"white",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"
-                }}/>
-              </button>
-            </div>
-          </div>
-
-          {/* ── MINUTEUR ── */}
-          <div style={{...s.card}}>
-            <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>⏱️ Minuteur de cuisson</div>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:52,fontWeight:800,color:timerSeconds===0?"#e05c6a":T.accent,fontVariantNumeric:"tabular-nums",letterSpacing:2,marginBottom:8}}>
-                {timerSeconds===null ? formatTimer(timerInitial) : formatTimer(timerSeconds)}
-              </div>
-              {timerSeconds!==null&&timerSeconds!==timerInitial&&<div style={{width:"100%",height:8,background:T.cardBorder,borderRadius:4,overflow:"hidden",marginBottom:14}}>
-                <div style={{width:`${(timerSeconds/timerInitial)*100}%`,height:"100%",background:`linear-gradient(90deg,${T.accent},${T.green})`,borderRadius:4,transition:"width 1s linear"}}/>
-              </div>}
-              <div style={{display:"flex",gap:8,marginBottom:12,justifyContent:"center",flexWrap:"wrap"}}>
-                {[5,10,15,20,30,45].map(m=>(
-                  <button key={m} onClick={()=>startTimer(m)} style={{
-                    padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",
-                    border:`1.5px solid ${timerInitial===m*60?T.accent:T.inputBorder}`,
-                    background:timerInitial===m*60?T.accentLight:"transparent",
-                    color:timerInitial===m*60?T.accent:T.textMuted,fontFamily:"inherit"
-                  }}>{m}min</button>
-                ))}
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>{setTimerSeconds(timerInitial);setTimerRunning(false);}} style={{...s.ghost,flex:1,fontSize:18}}>↺</button>
-                <button onClick={()=>setTimerRunning(r=>!r)} disabled={timerSeconds===null||timerSeconds===0} className="btn-anim" style={{
-                  ...s.primary,flex:2,fontSize:15,
-                  opacity:(timerSeconds===null||timerSeconds===0)?0.5:1
-                }}>
-                  {timerRunning?"⏸ Pause":"▶ Démarrer"}
-                </button>
-              </div>
-              {timerSeconds===0&&<div style={{marginTop:12,padding:"10px",background:"#fbeaea",borderRadius:10,color:"#e05c6a",fontWeight:700,fontSize:13}}>🔔 C'est prêt !</div>}
-            </div>
-          </div>
-
-          {/* ── COMPATIBILITÉ GOÛTS ── */}
-          {(()=>{
-            const users=Object.values(ALLOWED_EMAILS).map(u=>u.displayName);
-            const commonDishes=dishes.filter(d=>{
-              const ratings=users.map(u=>d.tasteByUser?.[u]).filter(v=>v!=null&&v>0);
-              return ratings.length>=2;
-            });
-            if(commonDishes.length<3) return <div style={{...s.card}}>
-              <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:6}}>💑 Compatibilité des goûts</div>
-              <div style={{fontSize:12,color:T.textMuted}}>Notez au moins 3 plats en commun pour voir votre score de compatibilité !</div>
-            </div>;
-            const diffs=commonDishes.map(d=>{
-              const r=users.map(u=>d.tasteByUser?.[u]||0);
-              return {dish:d,diff:Math.abs(r[0]-r[1]),avg:(r[0]+r[1])/2};
-            });
-            const compat=Math.round(100-((diffs.reduce((a,x)=>a+x.diff,0)/diffs.length)/4)*100);
-            const agree=diffs.filter(x=>x.diff<=1).sort((a,b)=>b.avg-a.avg).slice(0,3);
-            const disagree=diffs.filter(x=>x.diff>=2).sort((a,b)=>b.diff-a.diff).slice(0,3);
-            return <div style={{...s.card}}>
-              <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:14}}>💑 Compatibilité des goûts</div>
-              <div style={{textAlign:"center",marginBottom:14}}>
-                <div style={{fontSize:44,fontWeight:800,background:`linear-gradient(135deg,${T.accent},${T.green})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{compat}%</div>
-                <div style={{fontSize:12,color:T.textMuted}}>{compat>=80?"Vous avez des goûts très proches 💚":compat>=60?"Quelques différences, mais ça se complète 👍":"Vos goûts divergent souvent 🤔"}</div>
-                <div style={{width:"100%",height:8,background:T.cardBorder,borderRadius:4,overflow:"hidden",marginTop:8}}>
-                  <div style={{width:`${compat}%`,height:"100%",background:`linear-gradient(90deg,${T.accent},${T.green})`,borderRadius:4}}/>
+                  <div style={{fontSize:10,color:T.textLight,marginTop:1}}>{formatTimeAgo(a.ts)}</div>
                 </div>
-                <div style={{fontSize:11,color:T.textLight,marginTop:4}}>Sur {commonDishes.length} plats notés par les deux</div>
-              </div>
-              {agree.length>0&&<div style={{marginBottom:10}}>
-                <div style={{fontSize:10,fontWeight:800,color:T.green,textTransform:"uppercase",letterSpacing:0.8,marginBottom:6}}>💚 En accord</div>
-                {agree.map(({dish})=><div key={dish.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                  <div style={{width:28,height:28,borderRadius:7,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,overflow:"hidden",flexShrink:0}}>{(dish.thumbnail||dish.photo)?<img src={dish.thumbnail||dish.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}</div>
-                  <div style={{fontSize:12,color:T.text,flex:1}}>{dish.name}</div>
-                  <div style={{fontSize:11,color:T.textMuted}}>{users.map(u=>`${dish.tasteByUser?.[u]||0}`).join(" / ")}</div>
-                </div>)}
-              </div>}
-              {disagree.length>0&&<div>
-                <div style={{fontSize:10,fontWeight:800,color:"#e05c6a",textTransform:"uppercase",letterSpacing:0.8,marginBottom:6}}>🤔 Désaccords</div>
-                {disagree.map(({dish})=><div key={dish.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                  <div style={{width:28,height:28,borderRadius:7,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,overflow:"hidden",flexShrink:0}}>{(dish.thumbnail||dish.photo)?<img src={dish.thumbnail||dish.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}</div>
-                  <div style={{fontSize:12,color:T.text,flex:1}}>{dish.name}</div>
-                  <div style={{fontSize:11,color:T.textMuted}}>{users.map(u=>`${dish.tasteByUser?.[u]||0}`).join(" / ")}</div>
-                </div>)}
-              </div>}
-            </div>;
-          })()}
+              </div>)}
+            </div>
+          </div>
         </div>}
-      </div>
 
+        {/* activité fusionnée dans stats — supprimée comme onglet séparé */}
+
+        {/* ══ OUTILS — MODALE ⚙️ ══ */}
+        {showTools&&<div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.55)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setShowTools(false)}>
+          <div style={{background:T.bg,borderRadius:"22px 22px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",overscrollBehavior:"contain",boxShadow:`0 -20px 60px ${T.shadowMd}`}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"center",padding:"12px 0 8px"}}><div style={{width:36,height:4,background:T.inputBorder,borderRadius:2}}/></div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 20px 16px"}}>
+              <h2 style={{margin:0,fontSize:17,fontWeight:800,color:T.text}}>⚙️ Outils & Réglages</h2>
+              <button onClick={()=>setShowTools(false)} style={{...s.iconBtn,fontSize:22}}>×</button>
+            </div>
+            <div style={{padding:"0 16px 32px",display:"flex",flexDirection:"column",gap:14}}>
+
+              {/* ── THÈMES ── */}
+              <div style={{...s.card}}>
+                <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>🎨 Thème couleur</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  {Object.entries(PALETTES).map(([key,p])=>(
+                    <button key={key} onClick={()=>setPalette(key)} style={{
+                      display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+                      padding:"10px 6px",borderRadius:12,
+                      border:`2px solid ${palette===key?p.a:T.cardBorder}`,
+                      background:palette===key?`${p.a}18`:T.bg,
+                      cursor:"pointer",fontFamily:"inherit",position:"relative"
+                    }}>
+                      <div style={{width:"100%",height:28,borderRadius:8,background:p.headerBg}}/>
+                      <div style={{fontSize:11,fontWeight:700,color:T.text,textAlign:"center",lineHeight:1.3}}>{p.emoji} {p.name}</div>
+                      {palette===key&&<div style={{position:"absolute",top:4,right:6,fontSize:13,color:p.a,fontWeight:800}}>✓</div>}
+                    </button>
+                  ))}
+                </div>
+                <div style={{marginTop:12,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:12,background:T.bg,border:`1.5px solid ${T.cardBorder}`}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>🌙 Mode sombre</div>
+                    <div style={{fontSize:11,color:T.textMuted}}>Interface sombre</div>
+                  </div>
+                  <button onClick={()=>setDark(d=>!d)} style={{width:46,height:26,borderRadius:13,border:"none",cursor:"pointer",position:"relative",background:dark?"#4f86c6":"#ccd9e6",transition:"background 0.2s"}}>
+                    <div style={{position:"absolute",top:3,left:dark?22:3,width:20,height:20,borderRadius:10,background:"white",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}/>
+                  </button>
+                </div>
+              </div>
+
+              {/* ── MINUTEUR ── */}
+              <div style={{...s.card}}>
+                <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>⏱️ Minuteur de cuisson</div>
+                <div style={{textAlign:"center"}}>
+                  <div style={{fontSize:52,fontWeight:800,color:timerSeconds===0?"#e05c6a":T.accent,fontVariantNumeric:"tabular-nums",letterSpacing:2,marginBottom:8}}>
+                    {timerSeconds===null ? formatTimer(timerInitial) : formatTimer(timerSeconds)}
+                  </div>
+                  {timerSeconds!==null&&timerSeconds!==timerInitial&&(
+                    <div style={{width:"100%",height:8,background:T.cardBorder,borderRadius:4,overflow:"hidden",marginBottom:14}}>
+                      <div style={{width:`${(timerSeconds/timerInitial)*100}%`,height:"100%",background:`linear-gradient(90deg,${T.accent},${T.green})`,borderRadius:4,transition:"width 1s linear"}}/>
+                    </div>
+                  )}
+                  <div style={{display:"flex",gap:6,marginBottom:10,justifyContent:"center",flexWrap:"wrap"}}>
+                    {[5,10,15,20,30,45].map(m=>(
+                      <button key={m} onClick={()=>startTimer(m)} style={{
+                        padding:"4px 10px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",
+                        border:`1.5px solid ${timerInitial===m*60?T.accent:T.inputBorder}`,
+                        background:timerInitial===m*60?T.accentLight:"transparent",
+                        color:timerInitial===m*60?T.accent:T.textMuted,fontFamily:"inherit"
+                      }}>{m}min</button>
+                    ))}
+                  </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:12}}>
+                    <input type="number" min={1} max={180} placeholder="min"
+                      style={{...s.input,textAlign:"center",fontSize:15,fontWeight:700,width:70}}
+                      onChange={e=>{const v=parseInt(e.target.value);if(v>0&&v<=180){setTimerInitial(v*60);setTimerSeconds(v*60);setTimerRunning(false);}}}
+                    />
+                    <span style={{fontSize:12,color:T.textMuted}}>minutes personnalisées</span>
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>{setTimerSeconds(timerInitial);setTimerRunning(false);}} style={{...s.ghost,flex:1,fontSize:18}}>↺</button>
+                    <button onClick={()=>setTimerRunning(r=>!r)} disabled={timerSeconds===null||timerSeconds===0} className="btn-anim" style={{...s.primary,flex:2,fontSize:15,opacity:(timerSeconds===null||timerSeconds===0)?0.5:1}}>
+                      {timerRunning?"⏸ Pause":"▶ Démarrer"}
+                    </button>
+                  </div>
+                  {timerSeconds===0&&<div style={{marginTop:12,padding:"10px",background:"#fbeaea",borderRadius:10,color:"#e05c6a",fontWeight:700,fontSize:13}}>🔔 C{"'"}est prêt !</div>}
+                </div>
+              </div>
+
+              {/* ── COMPATIBILITÉ GOÛTS ── */}
+              <CompatCard dishes={dishes} T={T} ALLOWED_EMAILS={ALLOWED_EMAILS} avgTaste={avgTaste}/>
+
+            </div>
+          </div>
+        </div>}
       {/* ══ CONFETTIS ══ */}
       {showConfetti&&<div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:9999,overflow:"hidden"}}>
         <style>{`
@@ -1385,26 +1512,29 @@ export default function App() {
         return (
           <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.6)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setViewDish(null)}>
             <div style={{background:T.card,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",overscrollBehavior:"contain",WebkitOverflowScrolling:"touch",boxShadow:`0 -20px 60px ${T.shadowMd}`}} onClick={e=>e.stopPropagation()}>
-              {/* Photo plein écran bord à bord + fond flouté */}
-              <div style={{position:"relative",width:"100%",flexShrink:0,background:hasPhoto?"#111":T.headerBg,overflow:"hidden"}}>
-                {/* Fond flouté ambient */}
-                {hasPhoto&&<img src={d.photo||d.thumbnail} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",filter:"blur(24px) brightness(0.5)",transform:"scale(1.15)",zIndex:0}}/>}
+              {/* Photo plein écran bord à bord + fond flouté ambient */}
+              <div style={{position:"relative",width:"100%",flexShrink:0,background:hasPhoto?"#111":T.headerBg}}>
+                {/* Fond flouté ambient — derrière tout */}
+                {hasPhoto&&<div style={{position:"absolute",inset:0,overflow:"hidden",zIndex:0}}>
+                  <img src={d.photo||d.thumbnail} alt="" style={{width:"100%",height:"100%",objectFit:"cover",filter:"blur(28px) brightness(0.45) saturate(1.4)",transform:"scale(1.2)"}}/>
+                </div>}
+                {/* Photo principale */}
                 {hasPhoto
                   ? <img src={d.photo||d.thumbnail} alt="" style={{width:"100%",display:"block",position:"relative",zIndex:1}}/>
-                  : <div style={{height:100,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56}}>🍽️</div>
+                  : <div style={{height:120,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56,position:"relative",zIndex:1}}>🍽️</div>
                 }
-                {/* Dégradé bas pour lisibilité du titre */}
-                <div style={{position:"absolute",bottom:0,left:0,right:0,height:80,background:"linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)"}}/>
-                {/* Titre + catégories en overlay */}
-                <div style={{position:"absolute",bottom:14,left:16,right:48}}>
-                  <div style={{fontSize:20,fontWeight:800,color:"white",lineHeight:1.2,textShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>{d.name}</div>
+                {/* Dégradé bas pour lisibilité */}
+                <div style={{position:"absolute",bottom:0,left:0,right:0,height:90,background:"linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.3) 60%, transparent 100%)",zIndex:2}}/>
+                {/* Titre + catégories en overlay — zIndex 3 pour être au-dessus de tout */}
+                <div style={{position:"absolute",bottom:14,left:16,right:52,zIndex:3}}>
+                  <div style={{fontSize:20,fontWeight:800,color:"white",lineHeight:1.2,textShadow:"0 2px 8px rgba(0,0,0,0.6)"}}>{d.name}</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>
                     {cats.map(cat=>{const c=catColor(cat);return <span key={cat} style={{fontSize:10,fontWeight:700,color:c.color,background:"rgba(255,255,255,0.92)",borderRadius:8,padding:"2px 8px"}}>{cat}</span>;})}
                     {d.favorite&&<span style={{fontSize:10,fontWeight:700,color:"#d97706",background:"rgba(255,255,255,0.92)",borderRadius:8,padding:"2px 8px"}}>★ Favori</span>}
                   </div>
                 </div>
-                {/* Bouton fermer */}
-                <button onClick={()=>setViewDish(null)} style={{position:"absolute",top:12,right:12,background:"rgba(0,0,0,0.4)",border:"none",borderRadius:10,padding:"5px 10px",fontSize:18,color:"white",cursor:"pointer",lineHeight:1,backdropFilter:"blur(4px)"}}>×</button>
+                {/* Bouton fermer — zIndex 4 */}
+                <button onClick={()=>setViewDish(null)} style={{position:"absolute",top:12,right:12,background:"rgba(0,0,0,0.45)",border:"none",borderRadius:10,padding:"5px 10px",fontSize:18,color:"white",cursor:"pointer",lineHeight:1,backdropFilter:"blur(4px)",zIndex:4}}>×</button>
               </div>
 
               {/* Contenu scrollable */}
