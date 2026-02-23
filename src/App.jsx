@@ -1238,7 +1238,30 @@ export default function App() {
     iconBtn:{background:"transparent",border:"none",cursor:"pointer",fontSize:15,padding:"4px 6px",borderRadius:6,color:T.textMuted,lineHeight:1},
   };
 
-  if (authUser===undefined) return <Spinner T={T}/>;
+  const ElodiePlanSlot = ({slot, isWeekend}) => {
+    const entry = elodieCurrentPlan[slot];
+    const dish = entry ? elodieDishes.find(d=>d.id===entry.id) : null;
+    const display = dish || entry;
+    const meal = slot.split(" ").pop();
+    return (
+      <div style={{background:"transparent",border:`1.5px dashed ${isWeekend?T.weekendBorder:T.weekdayBorder}`,borderRadius:10,padding:"8px 10px",minHeight:62,transition:"all 0.15s"}}>
+        <div style={{fontSize:10,fontWeight:700,color:isWeekend?T.weekendHeader:T.weekdayHeader,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>{meal==="midi"?"☀️ Midi":"🌙 Soir"}</div>
+        {display?(
+          <div>
+            <div style={{width:"100%",aspectRatio:"4/3",borderRadius:9,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,marginBottom:6}}>
+              {(display.photo||display.thumbnail)?<img src={display.thumbnail||display.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:4}}>
+              <div style={{flex:1,fontSize:12,fontWeight:700,color:T.text,lineHeight:1.3,wordBreak:"break-word"}}>{display.name}</div>
+              <button onClick={()=>removeElodieFromPlan(slot)} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>{"×"}</button>
+            </div>
+          </div>
+        ):<button onClick={()=>setElodiePlanSlot(slot)} style={{background:"transparent",border:"none",color:T.textLight,fontSize:12,padding:"2px 0",cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"left"}}>{"+ Assigner"}</button>}
+      </div>
+    );
+  };
+
+    if (authUser===undefined) return <Spinner T={T}/>;
   if (!authUser) return (
     <div style={{...s.app,alignItems:"center",justifyContent:"center"}}>
       <div style={{width:"100%",maxWidth:320,padding:24}}>
@@ -1455,30 +1478,6 @@ export default function App() {
         {/* Barre blanche de séparation avec fond page */}
         <div style={{height:10,background:T.bg,borderRadius:"14px 14px 0 0",marginTop:-1}}/>
       </div>
-
-
-  const ElodiePlanSlot = ({slot, isWeekend}) => {
-    const entry = elodieCurrentPlan[slot];
-    const dish = entry ? elodieDishes.find(d=>d.id===entry.id) : null;
-    const display = dish || entry;
-    const meal = slot.split(" ").pop();
-    return (
-      <div style={{background:"transparent",border:`1.5px dashed ${isWeekend?T.weekendBorder:T.weekdayBorder}`,borderRadius:10,padding:"8px 10px",minHeight:62,transition:"all 0.15s"}}>
-        <div style={{fontSize:10,fontWeight:700,color:isWeekend?T.weekendHeader:T.weekdayHeader,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>{meal==="midi"?"☀️ Midi":"🌙 Soir"}</div>
-        {display?(
-          <div>
-            <div style={{width:"100%",aspectRatio:"4/3",borderRadius:9,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,marginBottom:6}}>
-              {(display.photo||display.thumbnail)?<img src={display.thumbnail||display.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:4}}>
-              <div style={{flex:1,fontSize:12,fontWeight:700,color:T.text,lineHeight:1.3,wordBreak:"break-word"}}>{display.name}</div>
-              <button onClick={()=>removeElodieFromPlan(slot)} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>{"×"}</button>
-            </div>
-          </div>
-        ):<button onClick={()=>setElodiePlanSlot(slot)} style={{background:"transparent",border:"none",color:T.textLight,fontSize:12,padding:"2px 0",cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"left"}}>{"+ Assigner"}</button>}
-      </div>
-    );
-  };
 
       {/* CONTENT */}
       <div style={{flex:1,padding:16,paddingBottom:36}}>
