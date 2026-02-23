@@ -439,6 +439,76 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
 }
 
 // ─── APP ─────────────────────────────────────────────────────────────────────
+// ─── Modale de sélection/saisie de plat pour le planning ───────
+// Composant externe = states isolés = clavier stable sur mobile
+function PlanPickModal({ slot, dishes, T, s, onClose, onAssign }) {
+  const [freeText, setFreeText] = useState("");
+  const [search, setSearch] = useState("");
+  const filtered = dishes.filter(d => !search || d.name.toLowerCase().includes(search.toLowerCase()));
+
+  const handleFree = () => {
+    if (!freeText.trim()) return;
+    onAssign({ id: null, name: freeText.trim(), photo: null, thumbnail: null }, slot);
+    setFreeText("");
+  };
+
+  const handleSelect = (dish) => {
+    onAssign(dish, slot);
+    setSearch("");
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.55)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div style={{background:T.card,borderRadius:"22px 22px 0 0",padding:"0 24px 28px",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:`0 -20px 60px rgba(0,0,0,0.25)`}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"center",padding:"12px 0 20px"}}>
+          <div style={{width:36,height:4,background:T.inputBorder,borderRadius:2}}/>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <h2 style={{margin:0,fontSize:17,fontWeight:800,color:T.text}}>{"Choisir : " + slot}</h2>
+          <button onClick={onClose} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:22,color:T.textMuted,padding:"2px 6px",lineHeight:1}}>{"×"}</button>
+        </div>
+        {/* Saisie libre — input non-contrôlé */}
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <input
+            placeholder={"✏️ Écrire un plat libre..."}
+            style={{...s.input,flex:1}}
+            onInput={e=>setFreeText(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter"){handleFree();}}}
+          />
+          <button
+            onClick={handleFree}
+            style={{...s.primary,padding:"10px 16px",flexShrink:0}}
+          >{"✓"}</button>
+        </div>
+        {/* Séparateur */}
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+          <div style={{flex:1,height:1,background:T.cardBorder}}/>
+          <span style={{fontSize:11,color:T.textMuted,fontWeight:700,textTransform:"uppercase",letterSpacing:0.5}}>{"ou choisir une fiche"}</span>
+          <div style={{flex:1,height:1,background:T.cardBorder}}/>
+        </div>
+        {/* Recherche — input non-contrôlé */}
+        <input
+          placeholder={"🔍 Rechercher une fiche..."}
+          style={{...s.input,marginBottom:10}}
+          onInput={e=>setSearch(e.target.value)}
+        />
+        <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:280,overflowY:"auto"}}>
+          {filtered.map(d=>(
+            <button key={d.id} onClick={()=>handleSelect(d)}
+              style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:T.bg,border:`1.5px solid ${T.cardBorder}`,borderRadius:12,cursor:"pointer",fontFamily:"inherit",textAlign:"left",width:"100%"}}>
+              <div style={{width:44,height:44,borderRadius:10,background:T.accentLight,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
+                {(d.thumbnail||d.photo)?<img src={d.thumbnail||d.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+              </div>
+              <span style={{fontSize:13,fontWeight:600,color:T.text}}>{d.name}</span>
+            </button>
+          ))}
+          {filtered.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"16px 0",fontSize:13}}>{"Aucun plat trouvé"}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [dark, setDark] = useState(() => load("dark", false));
   const [palette, setPalette] = useState(() => load("palette", "ocean"));
@@ -467,8 +537,7 @@ export default function App() {
   const [planSlot, setPlanSlot] = useState(null);
   const [pendingDishForPlan, setPendingDishForPlan] = useState(null);
   const [selectedSlots, setSelectedSlots] = useState([]);
-  const [planSearch, setPlanSearch] = useState("");
-  const [planFreeText, setPlanFreeText] = useState("");
+
   const [randomResult, setRandomResult] = useState(undefined);
   const [randomFilters, setRandomFilters] = useState({category:"",minTaste:1,maxTime:5,maxDishes:5});
   const [searchQ, setSearchQ] = useState(null);
@@ -863,7 +932,7 @@ export default function App() {
         {display?(
           <div draggable onDragStart={()=>setDragItem({slot,dish:entry})}>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <div style={{width:44,height:44,borderRadius:9,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,overflow:"hidden",flexShrink:0}}>
+              <div style={{width:56,height:56,borderRadius:11,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,overflow:"hidden",flexShrink:0}}>
                 {(display.photo||display.thumbnail)?<img src={display.thumbnail||display.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
               </div>
               <div style={{flex:1,fontSize:12,fontWeight:600,color:T.text,cursor:"grab",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{display.name}</div>
@@ -1508,39 +1577,7 @@ export default function App() {
         </div>
       </Modal>}
 
-      {planSlot&&planSlot!=="__pick__"&&<Modal title={`Choisir pour : ${planSlot}`} onClose={()=>{setPlanSlot(null);setPlanSearch("");setPlanFreeText("");}}>
-        {/* Saisie libre */}
-        <div style={{display:"flex",gap:8,marginBottom:12}}>
-          <input
-            value={planFreeText}
-            onChange={e=>setPlanFreeText(e.target.value)}
-            placeholder="✏️ Écrire un nom de plat..."
-            style={{...s.input,flex:1}}
-            onKeyDown={e=>{if(e.key==="Enter"&&planFreeText.trim()){assignDish({id:null,name:planFreeText.trim(),photo:null,thumbnail:null},planSlot);setPlanFreeText("");}}}
-          />
-          <button
-            onClick={()=>{if(planFreeText.trim()){assignDish({id:null,name:planFreeText.trim(),photo:null,thumbnail:null},planSlot);setPlanFreeText("");}}}
-            disabled={!planFreeText.trim()}
-            style={{...s.primary,padding:"10px 16px",flexShrink:0,opacity:planFreeText.trim()?1:0.4}}
-          >✓</button>
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-          <div style={{flex:1,height:1,background:T.cardBorder}}/>
-          <span style={{fontSize:11,color:T.textMuted,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>ou choisir une fiche</span>
-          <div style={{flex:1,height:1,background:T.cardBorder}}/>
-        </div>
-        {/* Recherche avec state local pour éviter perte de focus */}
-        <input
-          key={planSlot}
-          placeholder="🔍 Rechercher une fiche..."
-          style={{...s.input,marginBottom:10}}
-          onChange={e=>setPlanSearch(e.target.value)}
-        />
-        <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:300,overflowY:"auto"}}>
-          {dishes.filter(d=>!planSearch||d.name.toLowerCase().includes(planSearch.toLowerCase())).map(d=><CompactDishCard key={d.id} dish={d} onSelect={dish=>{assignDish(dish,planSlot);setPlanSearch("");}}/>)}
-          {dishes.filter(d=>!planSearch||d.name.toLowerCase().includes(planSearch.toLowerCase())).length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"16px 0",fontSize:13}}>Aucun plat trouvé</div>}
-        </div>
-      </Modal>}
+      {planSlot&&planSlot!=="__pick__"&&<PlanPickModal slot={planSlot} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={assignDish}/>}
 
       {(showAddIdea||editIdea)&&<Modal title={editIdea?"Modifier l'idée":"Nouvelle idée"} onClose={()=>{setShowAddIdea(false);setEditIdea(null);}}>
         <IdeaForm initial={editIdea} onSave={form=>saveIdea(form,!!editIdea)} onCancel={()=>{setShowAddIdea(false);setEditIdea(null);}}/>
