@@ -69,6 +69,37 @@
 // + Planning : fix recherche (state local, plus de perte de focus)
 // + Planning : miniatures agrandies (44×44px)
 // + Activité : log de connexion avec heure et date
+//
+// ── v10.2 ────────────────────────────────────────────────────────
+// + Planning : fix clavier mobile (PlanPickModal composant externe, inputs non-contrôlés)
+// + Planning : miniatures encore agrandies (56×56px)
+//
+// ── v10.3 ────────────────────────────────────────────────────────
+// + Fiche plat : fix photo bord à bord (hauteur naturelle, objectFit cover)
+// + Fiche plat : fix titre + catégories visibles (zIndex corrigé)
+// + Fiche plat : fix fond flouté visible (blur 22px derrière la photo)
+//
+// ── v10.4 ────────────────────────────────────────────────────────
+// + Roue aléatoire : mode "Choix manuel" — sélection de fiches ou saisie libre
+// + Roue aléatoire : composant WheelTab externe (clavier stable)
+//
+// ── v10.5 ────────────────────────────────────────────────────────
+// + Onglets Stats + Activité fusionnés en un seul onglet "Suivi" (🔎)
+// + Minuteur : saisie libre MM:SS (composant TimerInput externe)
+//
+// ── v10.6 ────────────────────────────────────────────────────────
+// + Fix minuteur : React.useRef → useRef (erreur page blanche onglet Outils)
+//
+// ── v10.7 ────────────────────────────────────────────────────────
+// + Header : suppression bouton mode sombre (déjà dans Outils)
+// + Onglet Suivi : icône 📊 → 🔎
+//
+// ── v10.8 ────────────────────────────────────────────────────────
+// + Planning : créneau redesigné — photo au-dessus, nom en dessous (2 colonnes)
+// + Minuteur : suppression des raccourcis prédéfinis (saisie libre uniquement)
+// + Thèmes : affichage en grille 3×2 (au lieu de liste verticale)
+// + Thèmes : 2 nouveaux thèmes — 🌿 Forêt et 🍬 Bonbon (5 thèmes au total)
+// + Onglets : Outils placé avant Suivi
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -122,15 +153,21 @@ const save = (k,v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catc
 
 // ── PALETTES ─────────────────────────────────────────────────────
 const PALETTES = {
-  ocean: { name:"Océan", emoji:"🌊", a:"#4f86c6", b:"#6bab8a",
+  ocean:    { name:"Océan",           emoji:"🌊", a:"#4f86c6", b:"#6bab8a",
     headerBg:"linear-gradient(135deg,#4f86c6 0%,#6bab8a 100%)",
     darkHeaderBg:"linear-gradient(135deg,#305888 0%,#2e6e50 100%)" },
-  sunset: { name:"Coucher de soleil", emoji:"🌅", a:"#e07040", b:"#c0509a",
+  sunset:   { name:"Coucher de soleil", emoji:"🌅", a:"#e07040", b:"#c0509a",
     headerBg:"linear-gradient(135deg,#e07040 0%,#c0509a 100%)",
     darkHeaderBg:"linear-gradient(135deg,#803020 0%,#702060 100%)" },
-  lavender: { name:"Lavande", emoji:"💜", a:"#8b6fd4", b:"#4ab8c8",
+  lavender: { name:"Lavande",         emoji:"💜", a:"#8b6fd4", b:"#4ab8c8",
     headerBg:"linear-gradient(135deg,#8b6fd4 0%,#4ab8c8 100%)",
     darkHeaderBg:"linear-gradient(135deg,#503890 0%,#226878 100%)" },
+  forest:   { name:"Forêt",           emoji:"🌿", a:"#2d8a5e", b:"#7ab840",
+    headerBg:"linear-gradient(135deg,#2d8a5e 0%,#7ab840 100%)",
+    darkHeaderBg:"linear-gradient(135deg,#145030 0%,#3a6010 100%)" },
+  candy:    { name:"Bonbon",          emoji:"🍬", a:"#e8529a", b:"#f5a623",
+    headerBg:"linear-gradient(135deg,#e8529a 0%,#f5a623 100%)",
+    darkHeaderBg:"linear-gradient(135deg,#901050 0%,#905010 100%)" },
 };
 
 function buildTheme(palette, dark) {
@@ -1127,7 +1164,7 @@ export default function App() {
 
   if (dataLoading) return <Spinner T={T}/>;
 
-  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},{id:"suivi",icon:"🔎",label:"Suivi"},{id:"tools",icon:"🔧",label:"Outils"}];
+  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},{id:"tools",icon:"🔧",label:"Outils"},{id:"suivi",icon:"🔎",label:"Suivi"}];
 
   const CategoryPills=({selected=[],onChange})=>(
     <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -1496,19 +1533,18 @@ export default function App() {
           {/* ── THÈMES ── */}
           <div style={{...s.card}}>
             <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>🎨 Thème couleur</div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
               {Object.entries(PALETTES).map(([key,p])=>(
                 <button key={key} onClick={()=>setPalette(key)} style={{
-                  display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:12,
+                  display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+                  padding:"10px 6px",borderRadius:12,
                   border:`2px solid ${palette===key?T.accent:T.cardBorder}`,
                   background:palette===key?T.accentLight:T.bg,
-                  cursor:"pointer",fontFamily:"inherit",textAlign:"left"
+                  cursor:"pointer",fontFamily:"inherit",position:"relative"
                 }}>
-                  <div style={{width:36,height:36,borderRadius:10,background:p.headerBg,flexShrink:0}}/>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{p.emoji} {p.name}</div>
-                  </div>
-                  {palette===key&&<div style={{fontSize:16,color:T.accent}}>✓</div>}
+                  <div style={{width:"100%",height:36,borderRadius:8,background:p.headerBg,flexShrink:0}}/>
+                  <div style={{fontSize:11,fontWeight:700,color:T.text,textAlign:"center",lineHeight:1.2}}>{p.emoji} {p.name}</div>
+                  {palette===key&&<div style={{position:"absolute",top:5,right:5,fontSize:12,color:T.accent,fontWeight:800}}>✓</div>}
                 </button>
               ))}
             </div>
@@ -1543,17 +1579,7 @@ export default function App() {
               <TimerInput timerInitial={timerInitial} timerRunning={timerRunning} T={T} s={s}
                 onStart={(totalSecs)=>{ setTimerInitial(totalSecs); setTimerSeconds(totalSecs); setTimerRunning(true); }}
               />
-              {/* Raccourcis rapides */}
-              <div style={{display:"flex",gap:6,marginBottom:12,justifyContent:"center",flexWrap:"wrap"}}>
-                {[5,10,15,20,30,45].map(m=>(
-                  <button key={m} onClick={()=>startTimer(m)} style={{
-                    padding:"4px 10px",borderRadius:20,fontSize:11,fontWeight:600,cursor:"pointer",
-                    border:`1.5px solid ${timerInitial===m*60?T.accent:T.inputBorder}`,
-                    background:timerInitial===m*60?T.accentLight:"transparent",
-                    color:timerInitial===m*60?T.accent:T.textMuted,fontFamily:"inherit"
-                  }}>{m}min</button>
-                ))}
-              </div>
+
               <div style={{display:"flex",gap:8}}>
                 <button onClick={()=>{setTimerSeconds(timerInitial);setTimerRunning(false);}} style={{...s.ghost,flex:1,fontSize:18}}>↺</button>
                 <button onClick={()=>setTimerRunning(r=>!r)} disabled={timerSeconds===null||timerSeconds===0} className="btn-anim" style={{
