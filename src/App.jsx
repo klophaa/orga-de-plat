@@ -439,6 +439,172 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
 }
 
 // ─── APP ─────────────────────────────────────────────────────────────────────
+// ─── Roue aléatoire — composant externe ────────────────────────
+function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
+  wheelAngle, wheelSpinning, wheelResult, setWheelResult,
+  wheelMode, setWheelMode, wheelCustomItems, setWheelCustomItems,
+  avgTaste, spinWheel, onPlan }) {
+
+  const SEG_COLORS=["#4f8ef7","#34c97e","#9b7fd4","#e07040","#4aa8b8","#d97706","#e05c6a","#5a9e78"];
+
+  const autoDishes = dishes.filter(d=>{
+    const avg=avgTaste(d);
+    if(randomFilters.category&&!(d.categories||[]).includes(randomFilters.category))return false;
+    if(avg>0&&avg<randomFilters.minTaste)return false;
+    if((d.timeRating||0)>randomFilters.maxTime&&d.timeRating>0)return false;
+    if((d.dishesRating||0)>randomFilters.maxDishes&&d.dishesRating>0)return false;
+    return true;
+  }).slice(0,8);
+
+  const wheelDishes = wheelMode==="custom" ? wheelCustomItems : autoDishes;
+  const segCount = wheelDishes.length||1;
+  const segAngle = 360/segCount;
+
+  const addDishToWheel = (dish) => {
+    if(wheelCustomItems.length>=8)return;
+    if(wheelCustomItems.find(x=>x.id&&x.id===dish.id))return;
+    setWheelCustomItems(prev=>[...prev,{id:dish.id,name:dish.name,photo:dish.thumbnail||dish.photo||null,thumbnail:dish.thumbnail||null}]);
+  };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {/* Toggle mode */}
+      <div style={{display:"flex",background:T.bg,borderRadius:12,padding:3,border:`1.5px solid ${T.cardBorder}`}}>
+        {[["auto","🎛️ Filtres auto"],["custom","✋ Choix manuel"]].map(([m,label])=>(
+          <button key={m} onClick={()=>{setWheelMode(m);setWheelResult(null);}}
+            style={{flex:1,padding:"8px 4px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:"inherit",
+              fontWeight:700,fontSize:12,transition:"all 0.18s",
+              background:wheelMode===m?T.accent:"transparent",
+              color:wheelMode===m?"white":T.textMuted}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Filtres automatiques */}
+      {wheelMode==="auto"&&<div style={{...s.card}}>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div><label style={s.label}>Catégorie</label>
+            <select value={randomFilters.category} onChange={e=>setRandomFilters(f=>({...f,category:e.target.value}))} style={s.input}>
+              <option value="">Toutes</option>{categories.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div><label style={s.label}>{"★ Goût minimum : "+randomFilters.minTaste+"/5"}</label><input type="range" min={1} max={5} value={randomFilters.minTaste} onChange={e=>setRandomFilters(f=>({...f,minTaste:+e.target.value}))} style={{width:"100%",accentColor:T.accent}}/></div>
+          <div><label style={s.label}>{"⏱️ Temps max : "+randomFilters.maxTime+"/5"}</label><input type="range" min={1} max={5} value={randomFilters.maxTime} onChange={e=>setRandomFilters(f=>({...f,maxTime:+e.target.value}))} style={{width:"100%",accentColor:T.green}}/></div>
+          <div><label style={s.label}>{"🫧 Vaisselle max : "+randomFilters.maxDishes+"/5"}</label><input type="range" min={1} max={5} value={randomFilters.maxDishes} onChange={e=>setRandomFilters(f=>({...f,maxDishes:+e.target.value}))} style={{width:"100%",accentColor:"#4aa8b8"}}/></div>
+        </div>
+      </div>}
+
+      {/* Sélection manuelle */}
+      {wheelMode==="custom"&&<div style={{...s.card}}>
+        <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>
+          {"Plats sur la roue ("+wheelCustomItems.length+"/8)"}
+        </div>
+        {/* Liste des plats sélectionnés */}
+        {wheelCustomItems.length>0&&<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+          {wheelCustomItems.map((item,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:T.bg,borderRadius:10,border:`1.5px solid ${SEG_COLORS[i%SEG_COLORS.length]}33`}}>
+              <div style={{width:8,height:8,borderRadius:4,background:SEG_COLORS[i%SEG_COLORS.length],flexShrink:0}}/>
+              <div style={{width:28,height:28,borderRadius:7,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
+                {(item.thumbnail||item.photo)?<img src={item.thumbnail||item.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+              </div>
+              <span style={{flex:1,fontSize:12,fontWeight:600,color:T.text}}>{item.name}</span>
+              <button onClick={()=>setWheelCustomItems(prev=>prev.filter((_,j)=>j!==i))}
+                style={{background:"transparent",border:"none",color:T.danger,fontSize:16,cursor:"pointer",padding:"2px 4px",lineHeight:1}}>{"×"}</button>
+            </div>
+          ))}
+        </div>}
+        {/* Ajouter depuis les fiches */}
+        {wheelCustomItems.length<8&&<div>
+          <div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>+ Ajouter une fiche</div>
+          <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:5}}>
+            {dishes.filter(d=>!wheelCustomItems.find(x=>x.id===d.id)).map(d=>(
+              <button key={d.id} onClick={()=>addDishToWheel(d)}
+                style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:T.card,border:`1.5px solid ${T.cardBorder}`,borderRadius:10,cursor:"pointer",fontFamily:"inherit",textAlign:"left",width:"100%"}}>
+                <div style={{width:28,height:28,borderRadius:7,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
+                  {(d.thumbnail||d.photo)?<img src={d.thumbnail||d.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+                </div>
+                <span style={{fontSize:12,fontWeight:600,color:T.text}}>{d.name}</span>
+                <span style={{marginLeft:"auto",fontSize:18,color:T.accent,lineHeight:1}}>+</span>
+              </button>
+            ))}
+          </div>
+        </div>}
+        {/* Saisie libre */}
+        {wheelCustomItems.length<8&&<WheelFreeInput onAdd={name=>setWheelCustomItems(prev=>[...prev,{id:null,name,photo:null,thumbnail:null}])} T={T} s={s}/>}
+        {wheelCustomItems.length===0&&<div style={{textAlign:"center",color:T.textLight,fontSize:13,padding:"12px 0"}}>Aucun plat ajouté</div>}
+      </div>}
+
+      {/* Roue SVG */}
+      {wheelDishes.length===0&&<div style={{textAlign:"center",color:T.textLight,fontSize:14,padding:24}}>
+        {wheelMode==="auto"?"Aucun plat ne correspond aux filtres 😅":"Ajoute des plats pour tourner la roue 👆"}
+      </div>}
+      {wheelDishes.length>0&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+        <div style={{position:"relative",display:"flex",justifyContent:"center",width:"100%"}}>
+          <div style={{position:"absolute",top:-12,zIndex:10,fontSize:24,color:T.accent,filter:"drop-shadow(0 2px 4px rgba(0,0,0,0.25))"}}>▼</div>
+          <svg width="260" height="260" viewBox="-130 -130 260 260"
+            style={{transform:`rotate(${wheelAngle}deg)`,transition:wheelSpinning?"transform 4s cubic-bezier(0.17,0.67,0.12,1)":"none",filter:"drop-shadow(0 8px 24px rgba(0,0,0,0.18))"}}>
+            {wheelDishes.map((dish,i)=>{
+              const sa=(i*segAngle-90)*Math.PI/180;
+              const ea=((i+1)*segAngle-90)*Math.PI/180;
+              const r=120,x1=r*Math.cos(sa),y1=r*Math.sin(sa),x2=r*Math.cos(ea),y2=r*Math.sin(ea);
+              const large=segAngle>180?1:0;
+              const ma=((i+0.5)*segAngle-90)*Math.PI/180;
+              const tx=72*Math.cos(ma),ty=72*Math.sin(ma);
+              const nm=dish.name.length>9?dish.name.slice(0,8)+"…":dish.name;
+              return <g key={dish.id||i}>
+                <path d={`M0,0 L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`} fill={SEG_COLORS[i%SEG_COLORS.length]} stroke="white" strokeWidth="2.5"/>
+                <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle"
+                  fontSize={segCount>6?9:11} fontWeight="700" fill="white"
+                  transform={`rotate(${(i+0.5)*segAngle},${tx},${ty})`}>{nm}</text>
+              </g>;
+            })}
+            <circle cx="0" cy="0" r="20" fill="white" stroke={T.accent} strokeWidth="3"/>
+            <text x="0" y="6" textAnchor="middle" fontSize="15">🪄</text>
+          </svg>
+        </div>
+        <button onClick={()=>spinWheel(wheelDishes)} disabled={wheelSpinning} className="btn-anim"
+          style={{...s.primary,padding:"14px 40px",fontSize:16,fontWeight:800,opacity:wheelSpinning?0.6:1,
+            background:`linear-gradient(135deg,${T.accent},${T.green})`}}>
+          {wheelSpinning?"🌀 En train de tourner…":"🎰 Tourner la roue !"}
+        </button>
+        {wheelResult&&!wheelSpinning&&<div style={{...s.card,width:"100%",border:`2px solid ${T.accent}`}}>
+          <div style={{textAlign:"center",fontWeight:800,fontSize:13,color:T.accent,marginBottom:10}}>{"✨ Ce soir c'est..."}</div>
+          <div style={{display:"flex",gap:12,alignItems:"center"}}>
+            <div style={{width:56,height:56,borderRadius:12,background:T.accentLight,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>
+              {(wheelResult.thumbnail||wheelResult.photo)?<img src={wheelResult.thumbnail||wheelResult.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:800,fontSize:16,color:T.text}}>{wheelResult.name}</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:12}}>
+            <button onClick={()=>{setWheelResult(null);spinWheel(wheelDishes);}} style={{...s.ghost,flex:1}}>{"🔄 Retourner"}</button>
+            <button className="btn-anim" onClick={()=>onPlan(wheelResult)} style={{...s.primary,flex:1}}>{"📅 Planifier"}</button>
+          </div>
+        </div>}
+      </div>}
+    </div>
+  );
+}
+
+// ─── Input saisie libre pour la roue (composant isolé) ─────────
+function WheelFreeInput({ onAdd, T, s }) {
+  return (
+    <div style={{display:"flex",gap:8,marginTop:10}}>
+      <input
+        placeholder={"✏️ Ajouter un mot libre..."}
+        style={{...s.input,flex:1,fontSize:12}}
+        onKeyDown={e=>{if(e.key==="Enter"&&e.target.value.trim()){onAdd(e.target.value.trim());e.target.value='';}}}
+      />
+      <button
+        onClick={e=>{const inp=e.currentTarget.previousSibling;if(inp.value.trim()){onAdd(inp.value.trim());inp.value='';}}}
+        style={{...s.primary,padding:"10px 14px",flexShrink:0,fontSize:16}}
+      >+</button>
+    </div>
+  );
+}
+
 // ─── Modale de sélection/saisie de plat pour le planning ───────
 // Composant externe = states isolés = clavier stable sur mobile
 function PlanPickModal({ slot, dishes, T, s, onClose, onAssign }) {
@@ -565,6 +731,8 @@ export default function App() {
   const [wheelAngle, setWheelAngle] = useState(0);
   const [wheelResult, setWheelResult] = useState(null);
   const wheelRef = useRef(null);
+  const [wheelMode, setWheelMode] = useState("auto"); // "auto" | "custom"
+  const [wheelCustomItems, setWheelCustomItems] = useState([]); // {id,name,photo,thumbnail}
   // ── Confettis ──
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -1180,81 +1348,24 @@ export default function App() {
         </div>}
 
         {/* ══ ALÉATOIRE — ROUE ══ */}
-        {tab==="random"&&(()=>{
-          const wheelDishes=dishes.filter(d=>{
-            const avg=avgTaste(d);
-            if(randomFilters.category&&!(d.categories||[]).includes(randomFilters.category))return false;
-            if(avg>0&&avg<randomFilters.minTaste)return false;
-            if((d.timeRating||0)>randomFilters.maxTime&&d.timeRating>0)return false;
-            if((d.dishesRating||0)>randomFilters.maxDishes&&d.dishesRating>0)return false;
-            return true;
-          }).slice(0,8);
-          const segCount=wheelDishes.length||1;
-          const segAngle=360/segCount;
-          const SEG_COLORS=[T.accent,T.green,"#9b7fd4","#e07040","#4aa8b8","#d97706","#e05c6a","#5a9e78"];
-          return <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            {/* Filtres */}
-            <div style={{...s.card}}>
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                <div><label style={s.label}>Catégorie</label><select value={randomFilters.category} onChange={e=>setRandomFilters(f=>({...f,category:e.target.value}))} style={s.input}><option value="">Toutes</option>{categories.map(c=><option key={c}>{c}</option>)}</select></div>
-                <div><label style={s.label}>★ Goût minimum : {randomFilters.minTaste}/5</label><input type="range" min={1} max={5} value={randomFilters.minTaste} onChange={e=>setRandomFilters(f=>({...f,minTaste:+e.target.value}))} style={{width:"100%",accentColor:T.accent}}/></div>
-                <div><label style={s.label}>⏱️ Temps max : {randomFilters.maxTime}/5</label><input type="range" min={1} max={5} value={randomFilters.maxTime} onChange={e=>setRandomFilters(f=>({...f,maxTime:+e.target.value}))} style={{width:"100%",accentColor:T.green}}/></div>
-                <div><label style={s.label}>🫧 Vaisselle max : {randomFilters.maxDishes}/5</label><input type="range" min={1} max={5} value={randomFilters.maxDishes} onChange={e=>setRandomFilters(f=>({...f,maxDishes:+e.target.value}))} style={{width:"100%",accentColor:T.teal}}/></div>
-              </div>
-            </div>
-            {wheelDishes.length===0&&<div style={{textAlign:"center",color:T.textLight,fontSize:14,padding:24}}>Aucun plat ne correspond aux filtres 😅</div>}
-            {wheelDishes.length>0&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
-              {/* Pointeur + Roue */}
-              <div style={{position:"relative",display:"flex",justifyContent:"center",width:"100%"}}>
-                <div style={{position:"absolute",top:-12,zIndex:10,fontSize:24,color:T.accent,filter:"drop-shadow(0 2px 4px rgba(0,0,0,0.25))"}}>▼</div>
-                <svg width="260" height="260" viewBox="-130 -130 260 260"
-                  style={{transform:`rotate(${wheelAngle}deg)`,
-                    transition:wheelSpinning?"transform 4s cubic-bezier(0.17,0.67,0.12,1)":"none",
-                    filter:"drop-shadow(0 8px 24px rgba(0,0,0,0.18))"}}>
-                  {wheelDishes.map((dish,i)=>{
-                    const sa=(i*segAngle-90)*Math.PI/180;
-                    const ea=((i+1)*segAngle-90)*Math.PI/180;
-                    const r=120,x1=r*Math.cos(sa),y1=r*Math.sin(sa),x2=r*Math.cos(ea),y2=r*Math.sin(ea);
-                    const large=segAngle>180?1:0;
-                    const ma=((i+0.5)*segAngle-90)*Math.PI/180;
-                    const tx=72*Math.cos(ma),ty=72*Math.sin(ma);
-                    const nm=dish.name.length>9?dish.name.slice(0,8)+"…":dish.name;
-                    return <g key={dish.id}>
-                      <path d={`M0,0 L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`} fill={SEG_COLORS[i%SEG_COLORS.length]} stroke="white" strokeWidth="2.5"/>
-                      <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle"
-                        fontSize={segCount>6?9:11} fontWeight="700" fill="white"
-                        transform={`rotate(${(i+0.5)*segAngle},${tx},${ty})`}>{nm}</text>
-                    </g>;
-                  })}
-                  <circle cx="0" cy="0" r="20" fill="white" stroke={T.accent} strokeWidth="3"/>
-                  <text x="0" y="6" textAnchor="middle" fontSize="15">🪄</text>
-                </svg>
-              </div>
-              <button onClick={()=>spinWheel(wheelDishes)} disabled={wheelSpinning} className="btn-anim"
-                style={{...s.primary,padding:"14px 40px",fontSize:16,fontWeight:800,
-                  opacity:wheelSpinning?0.6:1,
-                  background:`linear-gradient(135deg,${T.accent},${T.green})`}}>
-                {wheelSpinning?"🌀 En train de tourner…":"🎰 Tourner la roue !"}
-              </button>
-              {wheelResult&&!wheelSpinning&&<div style={{...s.card,width:"100%",border:`2px solid ${T.accent}`}}>
-                <div style={{textAlign:"center",fontWeight:800,fontSize:13,color:T.accent,marginBottom:10}}>✨ Ce soir c'est...</div>
-                <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                  <div style={{width:56,height:56,borderRadius:12,background:T.accentLight,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>
-                    {(wheelResult.thumbnail||wheelResult.photo)?<img src={wheelResult.thumbnail||wheelResult.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
-                  </div>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:800,fontSize:16,color:T.text}}>{wheelResult.name}</div>
-                    <StarRating icon="★" value={Math.round(avgTaste(wheelResult))} max={5} color="#f59e0b" size={14}/>
-                  </div>
-                </div>
-                <div style={{display:"flex",gap:8,marginTop:12}}>
-                  <button onClick={()=>{setWheelResult(null);spinWheel(wheelDishes);}} style={{...s.ghost,flex:1}}>🔄 Retourner</button>
-                  <button className="btn-anim" onClick={()=>{setPendingDishForPlan(wheelResult);setPlanSlot("__pick__");setSelectedSlots([]);}} style={{...s.primary,flex:1}}>📅 Planifier</button>
-                </div>
-              </div>}
-            </div>}
-          </div>;
-        })()}
+        {tab==="random"&&<WheelTab
+          dishes={dishes}
+          categories={categories}
+          T={T} s={s}
+          randomFilters={randomFilters}
+          setRandomFilters={setRandomFilters}
+          wheelAngle={wheelAngle}
+          wheelSpinning={wheelSpinning}
+          wheelResult={wheelResult}
+          setWheelResult={setWheelResult}
+          wheelMode={wheelMode}
+          setWheelMode={setWheelMode}
+          wheelCustomItems={wheelCustomItems}
+          setWheelCustomItems={setWheelCustomItems}
+          avgTaste={avgTaste}
+          spinWheel={spinWheel}
+          onPlan={(dish)=>{setPendingDishForPlan(dish);setPlanSlot("__pick__");setSelectedSlots([]);}}
+        />}
 
         {/* ══ STATS ══ */}
         {tab==="stats"&&<div>
@@ -1483,25 +1594,26 @@ export default function App() {
           <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.6)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setViewDish(null)}>
             <div style={{background:T.card,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",overscrollBehavior:"contain",WebkitOverflowScrolling:"touch",boxShadow:`0 -20px 60px ${T.shadowMd}`}} onClick={e=>e.stopPropagation()}>
               {/* Photo plein écran bord à bord + fond flouté */}
-              <div style={{position:"relative",width:"100%",flexShrink:0,background:hasPhoto?"#111":T.headerBg,overflow:"hidden"}}>
-                {/* Fond flouté ambient */}
-                {hasPhoto&&<img src={d.photo||d.thumbnail} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",filter:"blur(24px) brightness(0.5)",transform:"scale(1.15)",zIndex:0}}/>}
+              <div style={{position:"relative",width:"100%",flexShrink:0,minHeight:hasPhoto?220:100,maxHeight:320,background:hasPhoto?"#111":T.headerBg,overflow:"hidden"}}>
+                {/* Fond flouté ambient — DERRIÈRE tout */}
+                {hasPhoto&&<img src={d.photo||d.thumbnail} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",filter:"blur(20px) brightness(0.45)",transform:"scale(1.2)",zIndex:1,pointerEvents:"none"}}/>}
+                {/* Photo principale centrée */}
                 {hasPhoto
-                  ? <img src={d.photo||d.thumbnail} alt="" style={{width:"100%",display:"block",position:"relative",zIndex:1}}/>
-                  : <div style={{height:100,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56}}>🍽️</div>
+                  ? <img src={d.photo||d.thumbnail} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",zIndex:2}}/>
+                  : <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56,zIndex:2}}>🍽️</div>
                 }
-                {/* Dégradé bas pour lisibilité du titre */}
-                <div style={{position:"absolute",bottom:0,left:0,right:0,height:80,background:"linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)"}}/>
-                {/* Titre + catégories en overlay */}
-                <div style={{position:"absolute",bottom:14,left:16,right:48}}>
-                  <div style={{fontSize:20,fontWeight:800,color:"white",lineHeight:1.2,textShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>{d.name}</div>
+                {/* Dégradé fort en bas pour le titre */}
+                <div style={{position:"absolute",bottom:0,left:0,right:0,height:"55%",background:"linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.3) 60%, transparent 100%)",zIndex:3,pointerEvents:"none"}}/>
+                {/* Titre + catégories — AU DESSUS de tout */}
+                <div style={{position:"absolute",bottom:14,left:16,right:52,zIndex:4}}>
+                  <div style={{fontSize:20,fontWeight:800,color:"white",lineHeight:1.2,textShadow:"0 2px 8px rgba(0,0,0,0.7)"}}>{d.name}</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>
-                    {cats.map(cat=>{const c=catColor(cat);return <span key={cat} style={{fontSize:10,fontWeight:700,color:c.color,background:"rgba(255,255,255,0.92)",borderRadius:8,padding:"2px 8px"}}>{cat}</span>;})}
-                    {d.favorite&&<span style={{fontSize:10,fontWeight:700,color:"#d97706",background:"rgba(255,255,255,0.92)",borderRadius:8,padding:"2px 8px"}}>★ Favori</span>}
+                    {cats.map(cat=>{const c=catColor(cat);return <span key={cat} style={{fontSize:10,fontWeight:700,color:c.color,background:"rgba(255,255,255,0.95)",borderRadius:8,padding:"2px 8px"}}>{cat}</span>;})}
+                    {d.favorite&&<span style={{fontSize:10,fontWeight:700,color:"#d97706",background:"rgba(255,255,255,0.95)",borderRadius:8,padding:"2px 8px"}}>★ Favori</span>}
                   </div>
                 </div>
                 {/* Bouton fermer */}
-                <button onClick={()=>setViewDish(null)} style={{position:"absolute",top:12,right:12,background:"rgba(0,0,0,0.4)",border:"none",borderRadius:10,padding:"5px 10px",fontSize:18,color:"white",cursor:"pointer",lineHeight:1,backdropFilter:"blur(4px)"}}>×</button>
+                <button onClick={()=>setViewDish(null)} style={{position:"absolute",top:12,right:12,background:"rgba(0,0,0,0.45)",border:"none",borderRadius:10,padding:"5px 10px",fontSize:18,color:"white",cursor:"pointer",lineHeight:1,backdropFilter:"blur(6px)",zIndex:5}}>×</button>
               </div>
 
               {/* Contenu scrollable */}
