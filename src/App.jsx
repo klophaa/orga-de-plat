@@ -439,6 +439,71 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
 }
 
 // ─── APP ─────────────────────────────────────────────────────────────────────
+// ─── Saisie libre du minuteur ──────────────────────────────────
+function TimerInput({ timerInitial, timerRunning, T, s, onStart }) {
+  const minsRef = React.useRef(null);
+  const secsRef = React.useRef(null);
+
+  const handleStart = () => {
+    const m = parseInt(minsRef.current?.value || "0", 10) || 0;
+    const sec = parseInt(secsRef.current?.value || "0", 10) || 0;
+    const total = m * 60 + sec;
+    if (total > 0) onStart(total);
+  };
+
+  const initMins = Math.floor(timerInitial / 60);
+  const initSecs = timerInitial % 60;
+
+  return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:14}}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+        <input
+          ref={minsRef}
+          type="number"
+          min="0"
+          max="99"
+          defaultValue={initMins}
+          placeholder="00"
+          style={{
+            width:64,textAlign:"center",fontSize:28,fontWeight:800,
+            border:`2px solid ${T.inputBorder}`,borderRadius:12,
+            background:T.bg,color:T.text,fontFamily:"inherit",
+            padding:"8px 4px",outline:"none"
+          }}
+          onKeyDown={e=>{if(e.key==="Enter")handleStart();}}
+        />
+        <span style={{fontSize:10,color:T.textMuted,fontWeight:600}}>MIN</span>
+      </div>
+      <span style={{fontSize:32,fontWeight:800,color:T.accent,marginBottom:14}}>:</span>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+        <input
+          ref={secsRef}
+          type="number"
+          min="0"
+          max="59"
+          defaultValue={initSecs}
+          placeholder="00"
+          style={{
+            width:64,textAlign:"center",fontSize:28,fontWeight:800,
+            border:`2px solid ${T.inputBorder}`,borderRadius:12,
+            background:T.bg,color:T.text,fontFamily:"inherit",
+            padding:"8px 4px",outline:"none"
+          }}
+          onKeyDown={e=>{if(e.key==="Enter")handleStart();}}
+        />
+        <span style={{fontSize:10,color:T.textMuted,fontWeight:600}}>SEC</span>
+      </div>
+      <button
+        onClick={handleStart}
+        style={{
+          ...s.primary,padding:"12px 16px",borderRadius:12,fontSize:13,
+          fontWeight:700,alignSelf:"flex-start",marginTop:0,flexShrink:0
+        }}
+      >{"▶ Go"}</button>
+    </div>
+  );
+}
+
 // ─── Roue aléatoire — composant externe ────────────────────────
 function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
   wheelAngle, wheelSpinning, wheelResult, setWheelResult,
@@ -1062,7 +1127,7 @@ export default function App() {
 
   if (dataLoading) return <Spinner T={T}/>;
 
-  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},{id:"stats",icon:"🏆",label:"Stats"},{id:"activity",icon:"📰",label:"Activité"},{id:"tools",icon:"🔧",label:"Outils"}];
+  const TABS=[{id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},{id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},{id:"suivi",icon:"📊",label:"Suivi"},{id:"tools",icon:"🔧",label:"Outils"}];
 
   const CategoryPills=({selected=[],onChange})=>(
     <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -1368,7 +1433,7 @@ export default function App() {
         />}
 
         {/* ══ STATS ══ */}
-        {tab==="stats"&&<div>
+        {tab==="suivi"&&<div>
           <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:16}}>📊 Statistiques</div>
           {/* STREAK */}
           {streakCount>0&&<div style={{...s.card,marginBottom:14,background:"linear-gradient(135deg,#fff7ed,#fef3c7)",border:"1.5px solid #fcd34d"}}>
@@ -1414,12 +1479,9 @@ export default function App() {
           {computeStats.neverCooked.length>0&&<div style={{...s.card,marginBottom:12}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🆕 Jamais planifiés</div>{computeStats.neverCooked.map(d=><div key={d.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><div style={{fontSize:18}}>🍽️</div><div style={{flex:1,fontSize:13,fontWeight:600,color:T.text}}>{d.name}</div><button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setTab("plan");}} style={{...s.primary,fontSize:11,padding:"4px 10px"}}>Planifier</button></div>)}</div>}
           {Object.keys(computeStats.catDist).length>0&&<div style={{...s.card}}><div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🗂️ Catégories cette semaine</div>{Object.entries(computeStats.catDist).sort((a,b)=>b[1]-a[1]).map(([cat,count])=>{const c=catColor(cat);const pct=Math.round((count/Math.max(...Object.values(computeStats.catDist)))*100);return <div key={cat} style={{marginBottom:8}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:12,fontWeight:600,color:T.text}}>{cat}</span><span style={{fontSize:11,color:T.textMuted}}>{count} repas</span></div><div style={{height:6,background:T.cardBorder,borderRadius:3,overflow:"hidden"}}><div style={{width:`${pct}%`,height:"100%",background:c.color,borderRadius:3}}/></div></div>;})}
           </div>}
-        </div>}
-
-        {/* ══ ACTIVITÉ ══ */}
-        {tab==="activity"&&<div>
-          <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:14}}>📰 Fil d'activité</div>
-          {activityFeed.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"40px 0"}}>Aucune activité pour l'instant</div>}
+          {/* ══ FIL D'ACTIVITÉ ══ */}
+          <div style={{fontWeight:700,fontSize:14,color:T.text,marginBottom:10,marginTop:8}}>📰 Fil d'activité</div>
+          {activityFeed.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"24px 0"}}>Aucune activité pour l'instant</div>}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {activityFeed.map(a=><div key={a.id} style={{...s.card,display:"flex",gap:10,alignItems:"center"}}><Avatar user={a.user} size={34}/><div style={{flex:1}}><div style={{fontSize:13,color:T.text}}><strong style={{color:Object.values(ALLOWED_EMAILS).find(u=>u.displayName===a.user)?.color}}>{a.user}</strong> {a.msg}</div><div style={{fontSize:11,color:T.textLight,marginTop:2}}>{formatTimeAgo(a.ts)}</div></div></div>)}
           </div>
@@ -1475,10 +1537,15 @@ export default function App() {
               {timerSeconds!==null&&timerSeconds!==timerInitial&&<div style={{width:"100%",height:8,background:T.cardBorder,borderRadius:4,overflow:"hidden",marginBottom:14}}>
                 <div style={{width:`${(timerSeconds/timerInitial)*100}%`,height:"100%",background:`linear-gradient(90deg,${T.accent},${T.green})`,borderRadius:4,transition:"width 1s linear"}}/>
               </div>}
-              <div style={{display:"flex",gap:8,marginBottom:12,justifyContent:"center",flexWrap:"wrap"}}>
+              {/* Saisie libre mm:ss */}
+              <TimerInput timerInitial={timerInitial} timerRunning={timerRunning} T={T} s={s}
+                onStart={(totalSecs)=>{ setTimerInitial(totalSecs); setTimerSeconds(totalSecs); setTimerRunning(true); }}
+              />
+              {/* Raccourcis rapides */}
+              <div style={{display:"flex",gap:6,marginBottom:12,justifyContent:"center",flexWrap:"wrap"}}>
                 {[5,10,15,20,30,45].map(m=>(
                   <button key={m} onClick={()=>startTimer(m)} style={{
-                    padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:600,cursor:"pointer",
+                    padding:"4px 10px",borderRadius:20,fontSize:11,fontWeight:600,cursor:"pointer",
                     border:`1.5px solid ${timerInitial===m*60?T.accent:T.inputBorder}`,
                     background:timerInitial===m*60?T.accentLight:"transparent",
                     color:timerInitial===m*60?T.accent:T.textMuted,fontFamily:"inherit"
@@ -1494,7 +1561,7 @@ export default function App() {
                   {timerRunning?"⏸ Pause":"▶ Démarrer"}
                 </button>
               </div>
-              {timerSeconds===0&&<div style={{marginTop:12,padding:"10px",background:"#fbeaea",borderRadius:10,color:"#e05c6a",fontWeight:700,fontSize:13}}>🔔 C'est prêt !</div>}
+              {timerSeconds===0&&<div style={{marginTop:12,padding:"10px",background:"#fbeaea",borderRadius:10,color:"#e05c6a",fontWeight:700,fontSize:13}}>{"🔔 C'est prêt !"}</div>}
             </div>
           </div>
 
