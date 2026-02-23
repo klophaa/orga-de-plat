@@ -461,7 +461,7 @@ function CompatCard({ dishes, T, ALLOWED_EMAILS, avgTaste }) {
     return ratings.length >= 2;
   });
   if (commonDishes.length < 3) return (
-    <div style={{...T.card && {background:T.card}, border:`1.5px solid ${T.cardBorder}`,borderRadius:16,padding:16}}>
+    <div style={{border:`1.5px solid ${T.cardBorder}`,borderRadius:16,padding:16,background:T.card||"transparent"}}>
       <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:6}}>💑 Compatibilité des goûts</div>
       <div style={{fontSize:12,color:T.textMuted}}>Notez au moins 3 plats en commun pour voir votre score !</div>
     </div>
@@ -474,7 +474,7 @@ function CompatCard({ dishes, T, ALLOWED_EMAILS, avgTaste }) {
   const agree = diffs.filter(x => x.diff <= 1).sort((a,b) => b.avg-a.avg).slice(0,3);
   const disagree = diffs.filter(x => x.diff >= 2).sort((a,b) => b.diff-a.diff).slice(0,3);
   return (
-    <div style={{border:`1.5px solid ${T.cardBorder}`,borderRadius:16,padding:16,background:typeof T.card==="string"&&!T.card.includes("gradient")?T.card:"transparent"}}>
+    <div style={{border:`1.5px solid ${T.cardBorder}`,borderRadius:16,padding:16,background:T.card||"transparent"}}>
       <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:14}}>💑 Compatibilité des goûts</div>
       <div style={{textAlign:"center",marginBottom:14}}>
         <div style={{fontSize:44,fontWeight:800,background:`linear-gradient(135deg,${T.accent},${T.green})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{compat}%</div>
