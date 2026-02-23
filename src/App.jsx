@@ -441,8 +441,8 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
 // ─── APP ─────────────────────────────────────────────────────────────────────
 // ─── Saisie libre du minuteur ──────────────────────────────────
 function TimerInput({ timerInitial, timerRunning, T, s, onStart }) {
-  const minsRef = React.useRef(null);
-  const secsRef = React.useRef(null);
+  const minsRef = useRef(null);
+  const secsRef = useRef(null);
 
   const handleStart = () => {
     const m = parseInt(minsRef.current?.value || "0", 10) || 0;
