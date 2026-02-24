@@ -1290,8 +1290,8 @@ export default function App() {
     );
   };
 
-  const Modal=({title,onClose,children})=>(
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.55)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+  const Modal=({title,onClose,children,zIndex:zi=1000})=>(
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.55)",zIndex:zi,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
       <div style={{background:T.card,borderRadius:"22px 22px 0 0",padding:"0 24px 28px",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:`0 -20px 60px ${T.shadowMd}`}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"center",padding:"12px 0 20px"}}><div style={{width:36,height:4,background:T.inputBorder,borderRadius:2}}/></div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -1950,11 +1950,13 @@ export default function App() {
 
       {planSlot&&planSlot!=="__pick__"&&<PlanPickModal slot={planSlot} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={assignDish}/>}
 
+      {elodiePlanSlot&&elodiePlanSlot!=="__pick__"&&<PlanPickModal slot={elodiePlanSlot} dishes={elodieDishes} T={T} s={s} onClose={()=>setElodiePlanSlot(null)} onAssign={(dish,slot)=>assignElodieDish(dish,[slot])}/>}
+
       {(showAddIdea||editIdea)&&<Modal title={editIdea?"Modifier l'idée":"Nouvelle idée"} onClose={()=>{setShowAddIdea(false);setEditIdea(null);}}>
         <IdeaForm initial={editIdea} onSave={form=>saveIdea(form,!!editIdea)} onCancel={()=>{setShowAddIdea(false);setEditIdea(null);}}/>
       </Modal>}
 
-      {addCatModal&&<Modal title="Nouvelle catégorie" onClose={()=>setAddCatModal(false)}>
+      {addCatModal&&<Modal title="Nouvelle catégorie" onClose={()=>setAddCatModal(false)} zIndex={1100}>
         <label style={s.label}>Nom</label>
         <input value={newCatName} onChange={e=>setNewCatName(e.target.value)} style={{...s.input,marginBottom:14}} placeholder="Ex: Soupe" onKeyDown={e=>{if(e.key==="Enter"&&newCatName.trim()){addCategory(newCatName.trim());setNewCatName("");setAddCatModal(false);}}}/>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
