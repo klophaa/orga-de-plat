@@ -1,64 +1,35 @@
-const CACHE_NAME = "orga-de-plat-v1";
+// Service Worker — Orga de plat PWA
+const CACHE_NAME = "orga-plat-v4";
+const STATIC_ASSETS = ["/", "/index.html", "/static/js/main.chunk.js", "/static/css/main.chunk.css"];
 
-// Fichiers à mettre en cache pour le fonctionnement hors-ligne
-const STATIC_ASSETS = [
-  "/",
-  "/index.html",
-  "/manifest.json"
-];
-
-// Installation : mise en cache des fichiers statiques
-self.addEventListener("install", (event) => {
+self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS).catch(() => {}))
   );
   self.skipWaiting();
 });
 
-// Activation : suppression des anciens caches
-self.addEventListener("activate", (event) => {
+self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
-// Fetch : stratégie "Network First" — Firebase a besoin du réseau
-// Si pas de réseau → on sert le cache (page de base)
-self.addEventListener("fetch", (event) => {
-  // Ignorer les requêtes Firebase / non-GET
-  if (
-    event.request.method !== "GET" ||
-    event.request.url.includes("firestore.googleapis.com") ||
-    event.request.url.includes("firebase") ||
-    event.request.url.includes("googleapis.com")
-  ) {
-    return;
+self.addEventListener("fetch", event => {
+  // Réseau d'abord pour Firebase, cache en fallback pour le reste
+  if (event.request.url.includes("firebase") || event.request.url.includes("googleapis")) {
+    return; // laisse Firebase gérer
   }
-
   event.respondWith(
     fetch(event.request)
-      .then((response) => {
-        // Mettre à jour le cache avec la réponse fraîche
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, clone);
-        });
-        return response;
+      .then(res => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        return res;
       })
-      .catch(() => {
-        // Pas de réseau → servir depuis le cache
-        return caches.match(event.request).then((cached) => {
-          return cached || caches.match("/index.html");
-        });
-      })
+      .catch(() => caches.match(event.request))
   );
 });
