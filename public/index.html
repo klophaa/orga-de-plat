@@ -2,64 +2,28 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
-
-    <!-- ═══ PWA — ICÔNE & NOM ═══ -->
-    <link rel="icon" href="%PUBLIC_URL%/icons/icon-192.png" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-192.png" />
-
-    <!-- ═══ PWA — VIEWPORT & THÈME ═══ -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#4f86c6" />
-
-    <!-- ═══ PWA — PLEIN ÉCRAN iOS (Safari) ═══ -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Orga de plat" />
-
-    <!-- ═══ PWA — PLEIN ÉCRAN Android ═══ -->
+    <meta name="description" content="Organisation des repas en famille" />
     <meta name="mobile-web-app-capable" content="yes" />
-
-    <!-- ═══ PWA — MANIFEST ═══ -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Orga Plat" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-
-    <!-- ═══ SEO & Description ═══ -->
-    <meta name="description" content="Organisation des repas de la semaine" />
-    <meta name="application-name" content="Orga de plat" />
-
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icon-192.png" />
     <title>Orga de plat</title>
-
     <style>
-      /* Évite le bounce scroll iOS et le débordement */
-      html, body {
-        overscroll-behavior: none;
-        -webkit-overflow-scrolling: touch;
-        overflow: hidden;
-        height: 100%;
-        width: 100%;
-      }
-      #root {
-        height: 100%;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-      }
+      * { box-sizing: border-box; }
+      body { margin: 0; -webkit-font-smoothing: antialiased; }
     </style>
   </head>
   <body>
-    <noscript>JavaScript est requis pour utiliser Orga de plat.</noscript>
+    <noscript>JavaScript est requis pour cette application.</noscript>
     <div id="root"></div>
-
-    <!-- ═══ ENREGISTREMENT DU SERVICE WORKER ═══ -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-          navigator.serviceWorker
-            .register('/service-worker.js')
-            .then(function (reg) {
-              console.log('✅ Service Worker enregistré :', reg.scope);
-            })
-            .catch(function (err) {
-              console.log('❌ Service Worker échec :', err);
-            });
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js').catch(() => {});
         });
       }
     </script>
