@@ -823,7 +823,7 @@ export default function App() {
   const [filterFavOnly, setFilterFavOnly] = useState(false);
   const [filterDishes, setFilterDishes] = useState(0); // 0=tous, 1/2/3=max vaisselle
   const [filterTime, setFilterTime] = useState(0);     // 0=tous, 1/2/3=max temps
-  const [sortBy, setSortBy] = useState("recent");       // "recent" | "dishes" | "time"
+  const [sortBy, setSortBy] = useState(null);           // null | "dishes" | "time"
   const [historyWeek, setHistoryWeek] = useState(null);
   const [addCatModal, setAddCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -1087,9 +1087,10 @@ export default function App() {
       if (filterTime > 0 && (d.timeRating||0) > filterTime) return false;
       return true;
     });
+    // Tri récents toujours appliqué en base
+    list = [...list].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
     if (sortBy === "dishes") list = [...list].sort((a,b) => (a.dishesRating||0) - (b.dishesRating||0));
     else if (sortBy === "time") list = [...list].sort((a,b) => (a.timeRating||0) - (b.timeRating||0));
-    else list = [...list].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
     return list;
   }, [dishes, searchQ, filterCat, filterFavOnly, filterDishes, filterTime, sortBy]);
 
@@ -1521,10 +1522,12 @@ export default function App() {
 
           {/* Tri + filtres vaisselle/temps */}
           <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
-            <div style={{display:"flex",background:T.segBg,borderRadius:10,padding:2,gap:2}}>
-              {[{id:"recent",label:"🕐 Récents"},{id:"dishes",label:"🫧 Vaisselle"},{id:"time",label:"⏱️ Temps"}].map(opt=>(
-                <button key={opt.id} onClick={()=>setSortBy(opt.id)} style={{padding:"5px 9px",borderRadius:8,border:"none",background:sortBy===opt.id?T.card:"transparent",color:sortBy===opt.id?T.text:T.textMuted,fontWeight:sortBy===opt.id?700:400,fontSize:11,cursor:"pointer",fontFamily:"inherit",boxShadow:sortBy===opt.id?`0 1px 4px ${T.shadow}`:"none",whiteSpace:"nowrap"}}>{opt.label}</button>
+            <div style={{display:"flex",gap:4,alignItems:"center"}}>
+              <span style={{fontSize:11,color:T.textMuted,fontWeight:600}}>Tri :</span>
+              {[{id:"dishes",label:"🫧 Vaisselle"},{id:"time",label:"⏱️ Temps"}].map(opt=>(
+                <button key={opt.id} onClick={()=>setSortBy(s=>s===opt.id?null:opt.id)} style={{padding:"5px 10px",borderRadius:8,border:`1.5px solid ${sortBy===opt.id?"#4f86c6":T.inputBorder}`,background:sortBy===opt.id?T.accentLight:"transparent",color:sortBy===opt.id?T.accent:T.textMuted,fontWeight:sortBy===opt.id?700:400,fontSize:11,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>{opt.label}</button>
               ))}
+              {sortBy&&<button onClick={()=>setSortBy(null)} style={{padding:"4px 7px",borderRadius:8,border:`1.5px solid ${T.inputBorder}`,background:"transparent",color:T.textMuted,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>✕</button>}
             </div>
             <div style={{display:"flex",gap:3,alignItems:"center"}}>
               {[0,1,2,3].map(v=>(
