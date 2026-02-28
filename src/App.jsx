@@ -100,6 +100,16 @@
 // + Thèmes : affichage en grille 3×2 (au lieu de liste verticale)
 // + Thèmes : 2 nouveaux thèmes — 🌿 Forêt et 🍬 Bonbon (5 thèmes au total)
 // + Onglets : Outils placé avant Suivi
+//
+// ── v10.9 ────────────────────────────────────────────────────────
+// + Outils : minuteur déplacé au-dessus des thèmes couleur
+//
+// ── v11.0 ────────────────────────────────────────────────────────
+// + Onglets privés Élodie : "Plats Élodie" (👩‍🍳) + "Planning Élodie" (💜)
+// + Visibles et modifiables UNIQUEMENT quand Élodie est connectée
+// + Collections Firestore séparées : elodieDishes / elodieWeekPlans
+// + Totalement isolés du planning commun, de la roue et des stats
+// + Bannière violette dans chaque onglet pour signaler la nature privée
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -462,11 +472,11 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <div style={{display:"flex",alignItems:"center",gap:3,flex:1}}>
               <span style={{fontSize:11}}>🍽️</span>
-              <div style={{display:"flex",gap:1}}>{Array.from({length:5}).map((_,i)=><span key={i} style={{fontSize:10,opacity:i<(dish.dishesRating||0)?1:0.15,color:T.accent}}>●</span>)}</div>
+              <div style={{display:"flex",gap:1}}>{Array.from({length:3}).map((_,i)=><span key={i} style={{fontSize:10,opacity:i<(dish.dishesRating||0)?1:0.15,color:T.accent}}>●</span>)}</div>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:3,flex:1}}>
               <span style={{fontSize:11}}>⏱️</span>
-              <div style={{display:"flex",gap:1}}>{Array.from({length:5}).map((_,i)=><span key={i} style={{fontSize:10,opacity:i<(dish.timeRating||0)?1:0.15,color:T.green}}>●</span>)}</div>
+              <div style={{display:"flex",gap:1}}>{Array.from({length:3}).map((_,i)=><span key={i} style={{fontSize:10,opacity:i<(dish.timeRating||0)?1:0.15,color:T.green}}>●</span>)}</div>
             </div>
           </div>
         </div>
@@ -592,8 +602,8 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
             </select>
           </div>
           <div><label style={s.label}>{"★ Goût minimum : "+randomFilters.minTaste+"/5"}</label><input type="range" min={1} max={5} value={randomFilters.minTaste} onChange={e=>setRandomFilters(f=>({...f,minTaste:+e.target.value}))} style={{width:"100%",accentColor:T.accent}}/></div>
-          <div><label style={s.label}>{"⏱️ Temps max : "+randomFilters.maxTime+"/5"}</label><input type="range" min={1} max={5} value={randomFilters.maxTime} onChange={e=>setRandomFilters(f=>({...f,maxTime:+e.target.value}))} style={{width:"100%",accentColor:T.green}}/></div>
-          <div><label style={s.label}>{"🫧 Vaisselle max : "+randomFilters.maxDishes+"/5"}</label><input type="range" min={1} max={5} value={randomFilters.maxDishes} onChange={e=>setRandomFilters(f=>({...f,maxDishes:+e.target.value}))} style={{width:"100%",accentColor:"#4aa8b8"}}/></div>
+          <div><label style={s.label}>{"⏱️ Temps max : "+randomFilters.maxTime+"/3"}</label><input type="range" min={1} max={3} value={randomFilters.maxTime} onChange={e=>setRandomFilters(f=>({...f,maxTime:+e.target.value}))} style={{width:"100%",accentColor:T.green}}/></div>
+          <div><label style={s.label}>{"🫧 Vaisselle max : "+randomFilters.maxDishes+"/3"}</label><input type="range" min={1} max={3} value={randomFilters.maxDishes} onChange={e=>setRandomFilters(f=>({...f,maxDishes:+e.target.value}))} style={{width:"100%",accentColor:"#4aa8b8"}}/></div>
         </div>
       </div>}
 
@@ -807,10 +817,13 @@ export default function App() {
   const [selectedSlots, setSelectedSlots] = useState([]);
 
   const [randomResult, setRandomResult] = useState(undefined);
-  const [randomFilters, setRandomFilters] = useState({category:"",minTaste:1,maxTime:5,maxDishes:5});
+  const [randomFilters, setRandomFilters] = useState({category:"",minTaste:1,maxTime:3,maxDishes:3});
   const [searchQ, setSearchQ] = useState(null);
   const [filterCat, setFilterCat] = useState("");
   const [filterFavOnly, setFilterFavOnly] = useState(false);
+  const [filterDishes, setFilterDishes] = useState(0); // 0=tous, 1/2/3=max vaisselle
+  const [filterTime, setFilterTime] = useState(0);     // 0=tous, 1/2/3=max temps
+  const [sortBy, setSortBy] = useState("recent");       // "recent" | "dishes" | "time"
   const [historyWeek, setHistoryWeek] = useState(null);
   const [addCatModal, setAddCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -819,10 +832,12 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [ratingModal, setRatingModal] = useState(null); // dish to rate
   const [confirmResetPlan, setConfirmResetPlan] = useState(false);
+
   // ── États onglets privés Élodie ──
   const [elodieDishes, setElodieDishes] = useState([]);
   const [elodieWeekPlans, setElodieWeekPlans] = useState({});
   const [elodieSearchQ, setElodieSearchQ] = useState(null);
+  const [elodieFilterCat, setElodieFilterCat] = useState("");
   const [elodieFilterFav, setElodieFilterFav] = useState(false);
   const [elodiePlanView, setElodiePlanView] = useState("weekday");
   const [elodiePlanSlot, setElodiePlanSlot] = useState(null);
@@ -946,11 +961,18 @@ export default function App() {
     const handleBack = e => {
       // Check if any modal is open
       const anyModal = showAddDish||editDish||viewDish||showAddIdea||editIdea||
-        planSlot||historyWeek||addCatModal||ratingModal||confirmResetPlan;
+        planSlot||historyWeek||addCatModal||ratingModal||confirmResetPlan||
+        elodieShowAddDish||elodieViewDish||elodieEditDish||elodiePlanSlot||elodieHistoryWeek||elodieConfirmReset;
       if (anyModal) {
         e.preventDefault();
         // Close topmost modal
         if (confirmResetPlan) { setConfirmResetPlan(false); return; }
+        if (elodieConfirmReset) { setElodieConfirmReset(false); return; }
+        if (elodieHistoryWeek) { setElodieHistoryWeek(null); return; }
+        if (elodiePlanSlot) { setElodiePlanSlot(null); setElodiePendingDish(null); return; }
+        if (elodieViewDish) { setElodieViewDish(null); return; }
+        if (elodieEditDish) { setElodieEditDish(null); return; }
+        if (elodieShowAddDish) { setElodieShowAddDish(false); return; }
         if (ratingModal) { setRatingModal(null); return; }
         if (addCatModal) { setAddCatModal(false); return; }
         if (historyWeek) { setHistoryWeek(null); return; }
@@ -1014,6 +1036,7 @@ export default function App() {
     u.push(onSnapshot(doc(db,"config","categories"), s=>{ if(s.exists()) setCategories(s.data().list||DEFAULT_CATEGORIES); }));
     u.push(onSnapshot(collection(db,"weekPlans"), s=>{ const p={}; s.docs.forEach(d=>{p[d.id]=d.data();}); setWeekPlans(p); setDataLoading(false); }));
     u.push(onSnapshot(query(collection(db,"activity"),orderBy("ts","desc"),limit(50)), s=>setActivityFeed(s.docs.map(d=>({id:d.id,...d.data()})))));
+    // Collections privées Élodie
     u.push(onSnapshot(collection(db,"elodieDishes"), s=>setElodieDishes(s.docs.map(d=>({id:d.id,...d.data()})))));
     u.push(onSnapshot(collection(db,"elodieWeekPlans"), s=>{ const p={}; s.docs.forEach(d=>{p[d.id]=d.data();}); setElodieWeekPlans(p); }));
     return () => u.forEach(f=>f());
@@ -1055,12 +1078,20 @@ export default function App() {
 
   const avgTaste = d => { const v=Object.values(d.tasteByUser||{}).filter(Boolean); return v.length?v.reduce((a,b)=>a+b,0)/v.length:0; };
 
-  const filteredDishes = useMemo(() => dishes.filter(d => {
-    if (searchQ && !d.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
-    if (filterCat && !(d.categories||[]).includes(filterCat)) return false;
-    if (filterFavOnly && !d.favorite) return false;
-    return true;
-  }), [dishes, searchQ, filterCat, filterFavOnly]);
+  const filteredDishes = useMemo(() => {
+    let list = dishes.filter(d => {
+      if (searchQ && !d.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
+      if (filterCat && !(d.categories||[]).includes(filterCat)) return false;
+      if (filterFavOnly && !d.favorite) return false;
+      if (filterDishes > 0 && (d.dishesRating||0) > filterDishes) return false;
+      if (filterTime > 0 && (d.timeRating||0) > filterTime) return false;
+      return true;
+    });
+    if (sortBy === "dishes") list = [...list].sort((a,b) => (a.dishesRating||0) - (b.dishesRating||0));
+    else if (sortBy === "time") list = [...list].sort((a,b) => (a.timeRating||0) - (b.timeRating||0));
+    else list = [...list].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+    return list;
+  }, [dishes, searchQ, filterCat, filterFavOnly, filterDishes, filterTime, sortBy]);
 
   const saveDish = async (form, isEdit) => {
     const payload = {...form, updatedBy:currentUser, updatedAt:serverTimestamp()};
@@ -1143,36 +1174,68 @@ export default function App() {
   }, [dishes, weekPlans, currentWeekPlan]);
 
   const pastWeeks=Object.keys(weekPlans).filter(k=>k!==currentWeekKey).sort((a,b)=>b.localeCompare(a)).slice(0,10);
+
+  // ── Données calculées onglets Élodie ──
   const isElodie = currentUser === "Elodie";
   const elodieWeekKey = currentWeekKey;
   const elodieCurrentPlan = elodieWeekPlans[elodieWeekKey] || makeEmptyWeek();
   const elodiePastWeeks = Object.keys(elodieWeekPlans).filter(k=>k!==elodieWeekKey).sort((a,b)=>b.localeCompare(a)).slice(0,10);
   const elodieFiltered = elodieDishes.filter(d=>{
     if(elodieFilterFav && !d.favorite) return false;
+    if(elodieFilterCat && !(d.categories||[]).includes(elodieFilterCat)) return false;
     if(elodieSearchQ && !d.name.toLowerCase().includes(elodieSearchQ.toLowerCase())) return false;
     return true;
   });
-  const elodieWeekdayByDay = (()=>{ const days={}; WEEKDAY_SLOTS.forEach(slot=>{ const p=slot.split(" "); const meal=p.pop(); const day=p.join(" "); if(!days[day])days[day]={}; days[day][meal]=slot; }); return days; })();
-  const elodieWeekendByDay = (()=>{ const days={}; WEEKEND_SLOTS.forEach(slot=>{ const p=slot.split(" "); const meal=p.pop(); const day=p.join(" "); if(!days[day])days[day]={}; days[day][meal]=slot; }); return days; })();
+  const elodieWeekdayByDay = (() => {
+    const days={};
+    WEEKDAY_SLOTS.forEach(slot=>{
+      const parts=slot.split(" "); const meal=parts.pop(); const day=parts.join(" ");
+      if(!days[day]) days[day]={};
+      days[day][meal]=slot;
+    });
+    return days;
+  })();
+  const elodieWeekendByDay = (() => {
+    const days={};
+    WEEKEND_SLOTS.forEach(slot=>{
+      const parts=slot.split(" "); const meal=parts.pop(); const day=parts.join(" ");
+      if(!days[day]) days[day]={};
+      days[day][meal]=slot;
+    });
+    return days;
+  })();
   const catColor=cat=>{const idx=categories.indexOf(cat)%T.tagColors.length;return T.tagColors[Math.max(0,idx)];};
 
   // ── CRUD Élodie ──
   const saveElodieDish = async (form, isEdit) => {
-    const payload = {...form, updatedBy:currentUser, updatedAt:serverTimestamp()};
-    if(isEdit){ const{id,...data}=payload; await updateDoc(doc(db,"elodieDishes",id),data); }
-    else{ delete payload.id; payload.createdBy=currentUser; payload.createdAt=serverTimestamp(); await addDoc(collection(db,"elodieDishes"),payload); }
+    const payload = {...form, updatedBy: currentUser, updatedAt: serverTimestamp()};
+    if (isEdit) { const {id, ...data} = payload; await updateDoc(doc(db,"elodieDishes",id), data); }
+    else { delete payload.id; payload.createdBy=currentUser; payload.createdAt=serverTimestamp(); await addDoc(collection(db,"elodieDishes"), payload); }
     setElodieShowAddDish(false); setElodieEditDish(null);
   };
-  const deleteElodieDish = async (id) => { await deleteDoc(doc(db,"elodieDishes",id)); setElodieViewDish(null); };
-  const toggleElodieFav = async (dish) => { await updateDoc(doc(db,"elodieDishes",dish.id),{favorite:!dish.favorite}); };
-  const setElodieWeekPlan = async (plan) => { await setDoc(doc(db,"elodieWeekPlans",elodieWeekKey),plan); };
-  const assignElodieDish = async (dish, slots) => {
-    const plan={...elodieCurrentPlan};
-    slots.forEach(slot=>{ plan[slot]={id:dish.id,name:dish.name,photo:dish.thumbnail||dish.photo||null}; });
-    await setElodieWeekPlan(plan); setElodiePlanSlot(null); setElodiePendingDish(null); setElodieSelectedSlots([]);
+  const deleteElodieDish = async (id) => {
+    await deleteDoc(doc(db,"elodieDishes",id));
+    setElodieViewDish(null);
   };
-  const removeElodieFromPlan = async (slot) => { await setElodieWeekPlan({...elodieCurrentPlan,[slot]:null}); };
-  const resetElodiePlanning = async () => { await setElodieWeekPlan(makeEmptyWeek()); setElodieConfirmReset(false); };
+  const toggleElodieFav = async (dish) => {
+    await updateDoc(doc(db,"elodieDishes",dish.id), {favorite:!dish.favorite});
+  };
+  const setElodieCurrentWeekPlan = async (plan) => {
+    await setDoc(doc(db,"elodieWeekPlans",elodieWeekKey), plan);
+  };
+  const assignElodieDish = async (dish, slots) => {
+    const plan = {...elodieCurrentPlan};
+    slots.forEach(slot => { plan[slot] = {id:dish.id, name:dish.name, photo:dish.thumbnail||dish.photo||null}; });
+    await setElodieCurrentWeekPlan(plan);
+    setElodiePlanSlot(null); setElodiePendingDish(null); setElodieSelectedSlots([]);
+  };
+  const removeElodieFromPlan = async (slot) => {
+    await setElodieCurrentWeekPlan({...elodieCurrentPlan, [slot]:null});
+  };
+  const resetElodiePlanning = async () => {
+    await setElodieCurrentWeekPlan(makeEmptyWeek());
+    setElodieConfirmReset(false);
+  };
 
   const s = {
     app:{fontFamily:"'Inter','Segoe UI',system-ui,sans-serif",background:T.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto",display:"flex",flexDirection:"column",color:T.text},
@@ -1186,7 +1249,30 @@ export default function App() {
     iconBtn:{background:"transparent",border:"none",cursor:"pointer",fontSize:15,padding:"4px 6px",borderRadius:6,color:T.textMuted,lineHeight:1},
   };
 
-  if (authUser===undefined) return <Spinner T={T}/>;
+  const ElodiePlanSlot = ({slot, isWeekend}) => {
+    const entry = elodieCurrentPlan[slot];
+    const dish = entry ? elodieDishes.find(d=>d.id===entry.id) : null;
+    const display = dish || entry;
+    const meal = slot.split(" ").pop();
+    return (
+      <div style={{background:"transparent",border:`1.5px dashed ${isWeekend?T.weekendBorder:T.weekdayBorder}`,borderRadius:10,padding:"8px 10px",minHeight:62,transition:"all 0.15s"}}>
+        <div style={{fontSize:10,fontWeight:700,color:isWeekend?T.weekendHeader:T.weekdayHeader,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>{meal==="midi"?"☀️ Midi":"🌙 Soir"}</div>
+        {display?(
+          <div>
+            <div style={{width:"100%",aspectRatio:"4/3",borderRadius:9,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,marginBottom:6}}>
+              {(display.photo||display.thumbnail)?<img src={display.thumbnail||display.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:4}}>
+              <div style={{flex:1,fontSize:12,fontWeight:700,color:T.text,lineHeight:1.3,wordBreak:"break-word"}}>{display.name}</div>
+              <button onClick={()=>removeElodieFromPlan(slot)} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>{"×"}</button>
+            </div>
+          </div>
+        ):<button onClick={()=>setElodiePlanSlot(slot)} style={{background:"transparent",border:"none",color:T.textLight,fontSize:12,padding:"2px 0",cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"left"}}>{"+ Assigner"}</button>}
+      </div>
+    );
+  };
+
+    if (authUser===undefined) return <Spinner T={T}/>;
   if (!authUser) return (
     <div style={{...s.app,alignItems:"center",justifyContent:"center"}}>
       <div style={{width:"100%",maxWidth:320,padding:24}}>
@@ -1210,34 +1296,17 @@ export default function App() {
   if (dataLoading) return <Spinner T={T}/>;
 
   const TABS=[
-    {id:"dishes",icon:"🥘",label:"Plats"},{id:"plan",icon:"📅",label:"Planning"},
-    {id:"ideas",icon:"💡",label:"Idées"},{id:"random",icon:"🪄",label:"Aléatoire"},
-    {id:"tools",icon:"🔧",label:"Outils"},{id:"suivi",icon:"🔎",label:"Suivi"},
-    ...(isElodie?[{id:"elodieDishes",icon:"👩‍🍳",label:"Plats Élodie"},{id:"elodiePlan",icon:"💜",label:"Planning Élodie"}]:[]),
+    {id:"dishes",icon:"🥘",label:"Plats"},
+    {id:"plan",icon:"📅",label:"Planning"},
+    {id:"ideas",icon:"💡",label:"Idées"},
+    {id:"random",icon:"🪄",label:"Aléatoire"},
+    {id:"tools",icon:"🔧",label:"Outils"},
+    {id:"suivi",icon:"🔎",label:"Suivi"},
+    ...(isElodie ? [
+      {id:"elodieDishes",icon:"👩‍🍳",label:"Plats Élodie"},
+      {id:"elodiePlan",icon:"💜",label:"Plan Élodie"},
+    ] : []),
   ];
-
-  const ElodiePlanSlot = ({slot, isWeekend}) => {
-    const entry = elodieCurrentPlan[slot];
-    const dish = entry ? elodieDishes.find(d=>d.id===entry.id) : null;
-    const display = dish || entry;
-    const meal = slot.split(" ").pop();
-    return (
-      <div style={{background:"transparent",border:`1.5px dashed ${isWeekend?T.weekendBorder:T.weekdayBorder}`,borderRadius:10,padding:"8px 10px",minHeight:62}}>
-        <div style={{fontSize:10,fontWeight:700,color:isWeekend?T.weekendHeader:T.weekdayHeader,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>{meal==="midi"?"☀️ Midi":"🌙 Soir"}</div>
-        {display?(
-          <div>
-            <div style={{width:"100%",aspectRatio:"4/3",borderRadius:9,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,marginBottom:6}}>
-              {(display.photo||display.thumbnail)?<img src={display.thumbnail||display.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:4}}>
-              <div style={{flex:1,fontSize:12,fontWeight:700,color:T.text,lineHeight:1.3}}>{display.name}</div>
-              <button onClick={()=>removeElodieFromPlan(slot)} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>×</button>
-            </div>
-          </div>
-        ):<button onClick={()=>setElodiePlanSlot(slot)} style={{background:"transparent",border:"none",color:T.textLight,fontSize:12,padding:"2px 0",cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"left"}}>+ Assigner</button>}
-      </div>
-    );
-  };
 
   const CategoryPills=({selected=[],onChange})=>(
     <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -1290,8 +1359,8 @@ export default function App() {
     );
   };
 
-  const Modal=({title,onClose,children,zIndex:zi=1000})=>(
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.55)",zIndex:zi,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+  const Modal=({title,onClose,children})=>(
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.55)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
       <div style={{background:T.card,borderRadius:"22px 22px 0 0",padding:"0 24px 28px",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:`0 -20px 60px ${T.shadowMd}`}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"center",padding:"12px 0 20px"}}><div style={{width:36,height:4,background:T.inputBorder,borderRadius:2}}/></div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -1328,8 +1397,8 @@ export default function App() {
           </div>
         </div>
         <div><label style={s.label}>★ Mon goût ({currentUser})</label><StarRating icon="★" value={myTaste} onChange={v=>set("tasteByUser",{...form.tasteByUser,[currentUser]:v})} color="#f59e0b" size={24}/></div>
-        <div><label style={s.label}>🍽️ Vaisselle</label><StarRating icon="🫧" value={form.dishesRating} onChange={v=>set("dishesRating",v)} color={T.accent} size={22}/></div>
-        <div><label style={s.label}>⏱️ Temps de préparation</label><StarRating icon="⏱️" value={form.timeRating} onChange={v=>set("timeRating",v)} color={T.green} size={22}/></div>
+        <div><label style={s.label}>🍽️ Vaisselle</label><StarRating icon="🫧" value={form.dishesRating} max={3} onChange={v=>set("dishesRating",v)} color={T.accent} size={22}/></div>
+        <div><label style={s.label}>⏱️ Temps de préparation</label><StarRating icon="⏱️" value={form.timeRating} max={3} onChange={v=>set("timeRating",v)} color={T.green} size={22}/></div>
         <div><label style={s.label}>Recette</label><textarea value={form.recipe} onChange={e=>set("recipe",e.target.value)} style={{...s.input,height:90,resize:"vertical"}} placeholder="Instructions, notes..."/></div>
         <div><label style={s.label}>Liens</label><LinksEditor links={form.links} onChange={v=>set("links",v)} T={T} s={s}/></div>
         <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:14,color:T.textMuted}}><input type="checkbox" checked={form.favorite} onChange={e=>set("favorite",e.target.checked)}/> Favori ★</label>
@@ -1443,11 +1512,34 @@ export default function App() {
               placeholder="Rechercher un plat..." style={{...s.input}}/>
           </div>}
 
-          {/* Filtres en grille wrap — sans scroll */}
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+          {/* Filtres catégories */}
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
             <button onClick={()=>setFilterFavOnly(f=>!f)} style={{fontSize:12,padding:"5px 12px",borderRadius:10,cursor:"pointer",border:`1.5px solid ${filterFavOnly?"#f59e0b":T.inputBorder}`,background:filterFavOnly?"#fef3c7":"transparent",color:filterFavOnly?"#d97706":T.textMuted,fontFamily:"inherit",fontWeight:filterFavOnly?700:400}}>★ Favoris</button>
             <button onClick={()=>setFilterCat("")} style={{fontSize:12,padding:"5px 12px",borderRadius:10,cursor:"pointer",border:`1.5px solid ${filterCat===""?T.accent:T.inputBorder}`,background:filterCat===""?T.accentLight:"transparent",color:filterCat===""?T.accent:T.textMuted,fontFamily:"inherit",fontWeight:filterCat===""?700:400}}>Tous</button>
             {categories.map(cat=>{const active=filterCat===cat;const c=catColor(cat);return <button key={cat} onClick={()=>setFilterCat(active?"":cat)} style={{fontSize:12,padding:"5px 12px",borderRadius:10,cursor:"pointer",border:`1.5px solid ${active?c.color:T.inputBorder}`,background:active?c.bg:"transparent",color:active?c.color:T.textMuted,fontFamily:"inherit",fontWeight:active?700:400}}>{cat}</button>;})}
+          </div>
+
+          {/* Tri + filtres vaisselle/temps */}
+          <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
+            <div style={{display:"flex",background:T.segBg,borderRadius:10,padding:2,gap:2}}>
+              {[{id:"recent",label:"🕐 Récents"},{id:"dishes",label:"🫧 Vaisselle"},{id:"time",label:"⏱️ Temps"}].map(opt=>(
+                <button key={opt.id} onClick={()=>setSortBy(opt.id)} style={{padding:"5px 9px",borderRadius:8,border:"none",background:sortBy===opt.id?T.card:"transparent",color:sortBy===opt.id?T.text:T.textMuted,fontWeight:sortBy===opt.id?700:400,fontSize:11,cursor:"pointer",fontFamily:"inherit",boxShadow:sortBy===opt.id?`0 1px 4px ${T.shadow}`:"none",whiteSpace:"nowrap"}}>{opt.label}</button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:3,alignItems:"center"}}>
+              {[0,1,2,3].map(v=>(
+                <button key={v} onClick={()=>setFilterDishes(filterDishes===v&&v>0?0:v)} style={{padding:"4px 8px",borderRadius:8,border:`1.5px solid ${filterDishes===v&&v>0?"#4f86c6":T.inputBorder}`,background:filterDishes===v&&v>0?T.accentLight:"transparent",cursor:"pointer",fontSize:11,color:filterDishes===v&&v>0?T.accent:T.textMuted,fontFamily:"inherit",fontWeight:filterDishes===v&&v>0?700:400}}>
+                  {v===0?"🫧 max":"🫧".repeat(v)}
+                </button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:3,alignItems:"center"}}>
+              {[0,1,2,3].map(v=>(
+                <button key={v} onClick={()=>setFilterTime(filterTime===v&&v>0?0:v)} style={{padding:"4px 8px",borderRadius:8,border:`1.5px solid ${filterTime===v&&v>0?T.green:T.inputBorder}`,background:filterTime===v&&v>0?"#f0fdf4":"transparent",cursor:"pointer",fontSize:11,color:filterTime===v&&v>0?T.green:T.textMuted,fontFamily:"inherit",fontWeight:filterTime===v&&v>0?700:400}}>
+                  {v===0?"⏱️ max":"⏱️".repeat(v)}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Astuce swipe */}
@@ -1631,10 +1723,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* ── COMPATIBILITÉ GOÛTS ── */}
-          {(()=>{
-            const users=Object.values(ALLOWED_EMAILS).map(u=>u.displayName);
-            const commonDishes=dishes.filter(d=>{
           {/* ── THÈMES ── */}
           <div style={{...s.card}}>
             <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>🎨 Thème couleur</div>
@@ -1670,6 +1758,10 @@ export default function App() {
             </div>
           </div>
 
+          {/* ── COMPATIBILITÉ GOÛTS ── */}
+          {(()=>{
+            const users=Object.values(ALLOWED_EMAILS).map(u=>u.displayName);
+            const commonDishes=dishes.filter(d=>{
               const ratings=users.map(u=>d.tasteByUser?.[u]).filter(v=>v!=null&&v>0);
               return ratings.length>=2;
             });
@@ -1713,97 +1805,6 @@ export default function App() {
             </div>;
           })()}
         </div>}
-
-        {/* ══ PLATS ÉLODIE ══ */}
-        {tab==="elodieDishes"&&isElodie&&<div>
-          <div style={{...s.card,marginBottom:12,background:"linear-gradient(135deg,#f3e8ff,#ede9fe)",border:"1.5px solid #c4b5fd"}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{fontSize:28}}>👩‍🍳</div>
-              <div>
-                <div style={{fontSize:13,fontWeight:800,color:"#7c3aed"}}>Plats perso — Élodie</div>
-                <div style={{fontSize:11,color:"#8b5cf6",marginTop:2}}>Visible uniquement par toi 💜</div>
-              </div>
-            </div>
-          </div>
-          <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center"}}>
-            <button onClick={()=>setElodieSearchQ(q=>q===null?"":null)} style={{width:42,height:42,borderRadius:11,border:`1.5px solid ${elodieSearchQ!==null?T.accent:T.inputBorder}`,background:elodieSearchQ!==null?T.accentLight:T.card,cursor:"pointer",fontSize:19,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🔍</button>
-            <button onClick={()=>setElodieShowAddDish(true)} style={{...s.primary,flex:1,padding:"10px 0",textAlign:"center",background:"#7c3aed"}}>+ Ajouter un plat</button>
-          </div>
-          {elodieSearchQ!==null&&<div style={{marginBottom:10}}>
-            <input autoFocus value={elodieSearchQ} onChange={e=>setElodieSearchQ(e.target.value)} placeholder="Rechercher..." style={{...s.input}}/>
-          </div>}
-          <div style={{display:"flex",gap:6,marginBottom:12}}>
-            <button onClick={()=>setElodieFilterFav(f=>!f)} style={{fontSize:12,padding:"5px 12px",borderRadius:10,cursor:"pointer",border:`1.5px solid ${elodieFilterFav?"#f59e0b":T.inputBorder}`,background:elodieFilterFav?"#fef3c7":"transparent",color:elodieFilterFav?"#d97706":T.textMuted,fontFamily:"inherit",fontWeight:elodieFilterFav?700:400}}>★ Favoris</button>
-          </div>
-          {elodieFiltered.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"40px 0"}}>Aucun plat perso 🍽️<br/><span style={{fontSize:11}}>Ajoute tes plats rien qu'à toi !</span></div>}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {elodieFiltered.map((d,i)=>(
-              <div key={d.id} style={{animation:"cardSlideUp 0.35s ease both",animationDelay:`${Math.min(i*0.06,0.5)}s`}}>
-                <SwipeCard dish={d} T={T} catColor={catColor}
-                  onTap={dish=>setElodieViewDish(dish)}
-                  onSwipeRight={dish=>{ setElodiePendingDish(dish); setElodiePlanSlot("__pick__"); setElodieSelectedSlots([]); }}
-                  onSwipeLeft={dish=>toggleElodieFav(dish)}
-                  onLongPress={()=>{}}
-                />
-              </div>
-            ))}
-          </div>
-        </div>}
-
-        {/* ══ PLANNING ÉLODIE ══ */}
-        {tab==="elodiePlan"&&isElodie&&<div>
-          <div style={{...s.card,marginBottom:12,background:"linear-gradient(135deg,#f3e8ff,#ede9fe)",border:"1.5px solid #c4b5fd"}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{fontSize:28}}>💜</div>
-              <div>
-                <div style={{fontSize:13,fontWeight:800,color:"#7c3aed"}}>Planning perso — Élodie</div>
-                <div style={{fontSize:11,color:"#8b5cf6",marginTop:2}}>Visible uniquement par toi 💜</div>
-              </div>
-            </div>
-          </div>
-          <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
-            <div style={{display:"flex",background:T.segBg,borderRadius:12,padding:3,flex:1,gap:3}}>
-              {[{id:"weekday",label:"Lun → Ven midi",icon:"💼"},{id:"weekend",label:"Ven soir → Dim",icon:"🌿"}].map(v=>(
-                <button key={v.id} onClick={()=>setElodiePlanView(v.id)} style={{flex:1,padding:"9px 6px",borderRadius:9,border:"none",background:elodiePlanView===v.id?T.card:"transparent",color:elodiePlanView===v.id?(v.id==="weekday"?"#7c3aed":T.weekendHeader):T.textMuted,fontWeight:elodiePlanView===v.id?700:400,fontSize:12,cursor:"pointer",fontFamily:"inherit",boxShadow:elodiePlanView===v.id?`0 2px 8px ${T.shadow}`:"none"}}>{v.icon} {v.label}</button>
-              ))}
-            </div>
-            <button onClick={()=>setElodieConfirmReset(true)} style={{background:T.card,border:`1.5px solid ${T.inputBorder}`,borderRadius:10,padding:"8px 10px",cursor:"pointer",fontSize:16,color:T.danger,flexShrink:0}}>🗑️</button>
-          </div>
-          {elodiePlanView==="weekday"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {Object.entries(elodieWeekdayByDay).map(([day,meals])=>(
-              <div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:"#c4b5fd"}}>
-                <div style={{background:"#7c3aed",color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div>
-                <div style={{display:"grid",gridTemplateColumns:meals.soir?"1fr 1fr":"1fr",padding:8,gap:8}}>
-                  {meals.midi&&<ElodiePlanSlot slot={meals.midi} isWeekend={false}/>}
-                  {meals.soir&&<ElodiePlanSlot slot={meals.soir} isWeekend={false}/>}
-                </div>
-              </div>
-            ))}
-          </div>}
-          {elodiePlanView==="weekend"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {Object.entries(elodieWeekendByDay).map(([day,meals])=>(
-              <div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:"#c4b5fd"}}>
-                <div style={{background:"#8b5cf6",color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",padding:8,gap:8}}>
-                  {meals.midi&&<ElodiePlanSlot slot={meals.midi} isWeekend={true}/>}
-                  {meals.soir&&<ElodiePlanSlot slot={meals.soir} isWeekend={true}/>}
-                </div>
-              </div>
-            ))}
-          </div>}
-          {elodiePastWeeks.length>0&&<div style={{marginTop:24}}>
-            <div style={{fontWeight:700,color:T.textMuted,fontSize:11,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>📚 Semaines passées</div>
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {elodiePastWeeks.map(wk=>(
-                <button key={wk} onClick={()=>setElodieHistoryWeek(wk)} style={{...s.card,padding:"10px 14px",textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{fontWeight:600,color:T.text,fontSize:13}}>Semaine du {wk}</div>
-                  <div style={{fontSize:11,color:T.textMuted}}>{Object.values(elodieWeekPlans[wk]||{}).filter(Boolean).length} repas</div>
-                </button>
-              ))}
-            </div>
-          </div>}
-        </div>}
-
       </div>
 
       {/* ══ CONFETTIS ══ */}
@@ -1883,8 +1884,8 @@ export default function App() {
                   {Object.keys(d.tasteByUser||{}).length>0&&<div style={{fontSize:12,color:T.textMuted,marginTop:4}}>Moyenne : <strong style={{color:T.text}}>{avgTaste(d).toFixed(1)}/5</strong></div>}
                 </div>
                 <div style={{display:"flex",gap:20}}>
-                  <div><div style={{fontSize:11,color:T.textMuted,marginBottom:4}}>Vaisselle</div><StarRating icon="🫧" value={d.dishesRating||0} max={5} color={T.accent} size={16}/></div>
-                  <div><div style={{fontSize:11,color:T.textMuted,marginBottom:4}}>Temps</div><StarRating icon="⏱️" value={d.timeRating||0} max={5} color={T.green} size={16}/></div>
+                  <div><div style={{fontSize:11,color:T.textMuted,marginBottom:4}}>Vaisselle</div><StarRating icon="🫧" value={d.dishesRating||0} max={3} color={T.accent} size={16}/></div>
+                  <div><div style={{fontSize:11,color:T.textMuted,marginBottom:4}}>Temps</div><StarRating icon="⏱️" value={d.timeRating||0} max={3} color={T.green} size={16}/></div>
                 </div>
                 {d.recipe&&<div><div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Recette</div><div style={{fontSize:13,color:T.text,lineHeight:1.7,whiteSpace:"pre-wrap",background:T.activityBg,padding:"12px 14px",borderRadius:12}}>{d.recipe}</div></div>}
                 {links.filter(l=>l.url).length>0&&<div><div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Liens</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{links.filter(l=>l.url).map((l,i)=><a key={i} href={l.url} target="_blank" rel="noreferrer" style={{fontSize:13,color:T.accent,display:"flex",alignItems:"center",gap:6}}>🔗 {l.label||l.url}</a>)}</div></div>}
@@ -1950,13 +1951,11 @@ export default function App() {
 
       {planSlot&&planSlot!=="__pick__"&&<PlanPickModal slot={planSlot} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={assignDish}/>}
 
-      {elodiePlanSlot&&elodiePlanSlot!=="__pick__"&&<PlanPickModal slot={elodiePlanSlot} dishes={elodieDishes} T={T} s={s} onClose={()=>setElodiePlanSlot(null)} onAssign={(dish,slot)=>assignElodieDish(dish,[slot])}/>}
-
       {(showAddIdea||editIdea)&&<Modal title={editIdea?"Modifier l'idée":"Nouvelle idée"} onClose={()=>{setShowAddIdea(false);setEditIdea(null);}}>
         <IdeaForm initial={editIdea} onSave={form=>saveIdea(form,!!editIdea)} onCancel={()=>{setShowAddIdea(false);setEditIdea(null);}}/>
       </Modal>}
 
-      {addCatModal&&<Modal title="Nouvelle catégorie" onClose={()=>setAddCatModal(false)} zIndex={1100}>
+      {addCatModal&&<Modal title="Nouvelle catégorie" onClose={()=>setAddCatModal(false)}>
         <label style={s.label}>Nom</label>
         <input value={newCatName} onChange={e=>setNewCatName(e.target.value)} style={{...s.input,marginBottom:14}} placeholder="Ex: Soupe" onKeyDown={e=>{if(e.key==="Enter"&&newCatName.trim()){addCategory(newCatName.trim());setNewCatName("");setAddCatModal(false);}}}/>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
@@ -1972,49 +1971,120 @@ export default function App() {
         </div>
       </Modal>}
 
+        {/* ══ PLATS ÉLODIE ══ */}
+        {tab==="elodieDishes"&&isElodie&&<div>
+          <div style={{...s.card,marginBottom:12,background:"linear-gradient(135deg,#f3e8ff,#ede9fe)",border:"1.5px solid #c4b5fd"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{fontSize:28}}>👩‍🍳</div>
+              <div>
+                <div style={{fontSize:13,fontWeight:800,color:"#7c3aed"}}>Plats perso — Élodie</div>
+                <div style={{fontSize:11,color:"#8b5cf6",marginTop:2}}>Visible uniquement par toi 💜</div>
+              </div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center"}}>
+            <button onClick={()=>setElodieSearchQ(q=>q===null?"":null)} style={{width:42,height:42,borderRadius:11,border:`1.5px solid ${elodieSearchQ!==null?T.accent:T.inputBorder}`,background:elodieSearchQ!==null?T.accentLight:T.card,cursor:"pointer",fontSize:19,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🔍</button>
+            <button onClick={()=>setElodieShowAddDish(true)} style={{...s.primary,flex:1,padding:"10px 0",textAlign:"center",background:"#7c3aed"}}>+ Ajouter un plat</button>
+          </div>
+          {elodieSearchQ!==null&&<div style={{marginBottom:10}}>
+            <input autoFocus value={elodieSearchQ} onInput={e=>setElodieSearchQ(e.target.value)} placeholder="Rechercher..." style={{...s.input}}/>
+          </div>}
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+            <button onClick={()=>setElodieFilterFav(f=>!f)} style={{fontSize:12,padding:"5px 12px",borderRadius:10,cursor:"pointer",border:`1.5px solid ${elodieFilterFav?"#f59e0b":T.inputBorder}`,background:elodieFilterFav?"#fef3c7":"transparent",color:elodieFilterFav?"#d97706":T.textMuted,fontFamily:"inherit",fontWeight:elodieFilterFav?700:400}}>★ Favoris</button>
+            <button onClick={()=>setElodieFilterCat("")} style={{fontSize:12,padding:"5px 12px",borderRadius:10,cursor:"pointer",border:`1.5px solid ${elodieFilterCat===""?"#7c3aed":T.inputBorder}`,background:elodieFilterCat===""?"#f3e8ff":"transparent",color:elodieFilterCat===""?"#7c3aed":T.textMuted,fontFamily:"inherit",fontWeight:elodieFilterCat===""?700:400}}>Tous</button>
+            {categories.map(cat=>{const active=elodieFilterCat===cat;const c=catColor(cat);return <button key={cat} onClick={()=>setElodieFilterCat(active?"":cat)} style={{fontSize:12,padding:"5px 12px",borderRadius:10,cursor:"pointer",border:`1.5px solid ${active?c.color:T.inputBorder}`,background:active?c.bg:"transparent",color:active?c.color:T.textMuted,fontFamily:"inherit",fontWeight:active?700:400}}>{cat}</button>;})}
+          </div>
+          {elodieFiltered.length===0&&<div style={{textAlign:"center",color:T.textLight,padding:"40px 0"}}>Aucun plat perso 🍽️<br/><span style={{fontSize:11}}>Ajoute tes plats rien qu'à toi !</span></div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {elodieFiltered.map((d,i)=>(
+              <div key={d.id} style={{animation:"cardSlideUp 0.35s ease both",animationDelay:`${Math.min(i*0.06,0.5)}s`}}>
+                <SwipeCard dish={d} T={T} catColor={catColor}
+                  onTap={dish=>setElodieViewDish(dish)}
+                  onSwipeRight={dish=>{ setElodiePendingDish(dish); setElodiePlanSlot("__pick__"); setElodieSelectedSlots([]); }}
+                  onSwipeLeft={dish=>toggleElodieFav(dish)}
+                  onLongPress={()=>{}}
+                />
+              </div>
+            ))}
+          </div>
+        </div>}
+
+        {/* ══ PLANNING ÉLODIE ══ */}
+        {tab==="elodiePlan"&&isElodie&&<div>
+          <div style={{...s.card,marginBottom:12,background:"linear-gradient(135deg,#f3e8ff,#ede9fe)",border:"1.5px solid #c4b5fd"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{fontSize:28}}>💜</div>
+              <div>
+                <div style={{fontSize:13,fontWeight:800,color:"#7c3aed"}}>Planning perso — Élodie</div>
+                <div style={{fontSize:11,color:"#8b5cf6",marginTop:2}}>Visible uniquement par toi 💜</div>
+              </div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
+            <div style={{display:"flex",background:T.segBg,borderRadius:12,padding:3,flex:1,gap:3}}>
+              {[{id:"weekday",label:"Lun → Ven midi",icon:"💼"},{id:"weekend",label:"Ven soir → Dim",icon:"🌿"}].map(v=><button key={v.id} onClick={()=>setElodiePlanView(v.id)} style={{flex:1,padding:"9px 6px",borderRadius:9,border:"none",background:elodiePlanView===v.id?T.card:"transparent",color:elodiePlanView===v.id?(v.id==="weekday"?"#7c3aed":T.weekendHeader):T.textMuted,fontWeight:elodiePlanView===v.id?700:400,fontSize:12,cursor:"pointer",fontFamily:"inherit",boxShadow:elodiePlanView===v.id?`0 2px 8px ${T.shadow}`:"none"}}>{v.icon} {v.label}</button>)}
+            </div>
+            <button onClick={()=>setElodieConfirmReset(true)} title="Remettre à zéro" style={{background:T.card,border:`1.5px solid ${T.inputBorder}`,borderRadius:10,padding:"8px 10px",cursor:"pointer",fontSize:16,color:T.danger,flexShrink:0}}>🗑️</button>
+          </div>
+          {elodiePlanView==="weekday"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{Object.entries(elodieWeekdayByDay).map(([day,meals])=><div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:"#c4b5fd"}}><div style={{background:"#7c3aed",color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div><div style={{display:"grid",gridTemplateColumns:meals.soir?"1fr 1fr":"1fr",padding:8,gap:8}}>{meals.midi&&<ElodiePlanSlot slot={meals.midi} isWeekend={false}/>}{meals.soir&&<ElodiePlanSlot slot={meals.soir} isWeekend={false}/>}</div></div>)}</div>}
+          {elodiePlanView==="weekend"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{Object.entries(elodieWeekendByDay).map(([day,meals])=><div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:"#c4b5fd"}}><div style={{background:"#8b5cf6",color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",padding:8,gap:8}}>{meals.midi&&<ElodiePlanSlot slot={meals.midi} isWeekend={true}/>}{meals.soir&&<ElodiePlanSlot slot={meals.soir} isWeekend={true}/>}</div></div>)}</div>}
+          {elodiePastWeeks.length>0&&<div style={{marginTop:24}}><div style={{fontWeight:700,color:T.textMuted,fontSize:11,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>📚 Semaines passées</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{elodiePastWeeks.map(wk=><button key={wk} onClick={()=>setElodieHistoryWeek(wk)} style={{...s.card,padding:"10px 14px",textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontWeight:600,color:T.text,fontSize:13}}>Semaine du {wk}</div><div style={{fontSize:11,color:T.textMuted}}>{Object.values(elodieWeekPlans[wk]||{}).filter(Boolean).length} repas</div></button>)}</div></div>}
+        </div>}
+
       {/* ══ MODALES ÉLODIE ══ */}
 
+      {/* Modale ajout/edit plat Élodie */}
       {(elodieShowAddDish||elodieEditDish)&&<Modal title={elodieEditDish?"Modifier le plat":"Nouveau plat perso"} onClose={()=>{setElodieShowAddDish(false);setElodieEditDish(null);}}>
-        <DishForm initial={elodieEditDish} categories={[]} T={T} s={s} onSave={form=>saveElodieDish(form,!!elodieEditDish)} onCancel={()=>{setElodieShowAddDish(false);setElodieEditDish(null);}}/>
+        <DishForm initial={elodieEditDish} categories={categories} T={T} s={s}
+          onSave={form=>saveElodieDish(form,!!elodieEditDish)}
+          onCancel={()=>{setElodieShowAddDish(false);setElodieEditDish(null);}}
+        />
       </Modal>}
 
+      {/* Fiche plat Élodie */}
       {elodieViewDish&&<Modal title={elodieViewDish.name} onClose={()=>setElodieViewDish(null)}>
         {(elodieViewDish.thumbnail||elodieViewDish.photo)&&<img src={elodieViewDish.thumbnail||elodieViewDish.photo} alt="" style={{width:"100%",borderRadius:12,marginBottom:12,maxHeight:180,objectFit:"cover"}}/>}
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+          {(elodieViewDish.categories||[]).map(c=>{const cc=catColor(c);return <span key={c} style={{background:cc.bg,color:cc.color,borderRadius:8,padding:"3px 10px",fontSize:12,fontWeight:700}}>{c}</span>;})}
           {elodieViewDish.favorite&&<span style={{background:"#fef3c7",color:"#d97706",borderRadius:8,padding:"3px 10px",fontSize:12,fontWeight:700}}>★ Favori</span>}
         </div>
         {elodieViewDish.notes&&<p style={{fontSize:13,color:T.textMuted,marginBottom:14,lineHeight:1.6}}>{elodieViewDish.notes}</p>}
         <div style={{display:"flex",gap:8,marginBottom:8}}>
           <button onClick={()=>{setElodieEditDish(elodieViewDish);setElodieViewDish(null);}} style={{...s.ghost,flex:1}}>✏️ Modifier</button>
-          <button onClick={()=>toggleElodieFav(elodieViewDish)} style={{...s.ghost,flex:1}}>{elodieViewDish.favorite?"★ Retirer":"☆ Favori"}</button>
+          <button onClick={()=>toggleElodieFav(elodieViewDish)} style={{...s.ghost,flex:1}}>{elodieViewDish.favorite?"★ Retirer favori":"☆ Favori"}</button>
         </div>
-        <button onClick={()=>deleteElodieDish(elodieViewDish.id)} style={{...s.ghost,width:"100%",color:T.danger,borderColor:T.danger}}>🗑️ Supprimer</button>
+        <button onClick={()=>deleteElodieDish(elodieViewDish.id)} style={{...s.ghost,width:"100%",color:T.danger,borderColor:T.danger}}>🗑️ Supprimer ce plat</button>
       </Modal>}
 
+      {/* PlanPick Élodie — choisir un créneau */}
       {elodiePlanSlot==="__pick__"&&elodiePendingDish&&<Modal title={`Planifier "${elodiePendingDish.name}"`} onClose={()=>{setElodiePlanSlot(null);setElodiePendingDish(null);setElodieSelectedSlots([]);}}>
         <div style={{fontSize:12,color:T.textMuted,marginBottom:10}}>Sélectionne un ou plusieurs créneaux :</div>
         <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:280,overflowY:"auto",marginBottom:14}}>
-          {ALL_SLOTS.map(slot=>{ const sel=elodieSelectedSlots.includes(slot); const occ=elodieCurrentPlan[slot];
+          {ALL_SLOTS.map(slot=>{
+            const sel=elodieSelectedSlots.includes(slot);
+            const occ=elodieCurrentPlan[slot];
             return <button key={slot} onClick={()=>setElodieSelectedSlots(prev=>sel?prev.filter(x=>x!==slot):[...prev,slot])} style={{padding:"9px 12px",borderRadius:10,border:`1.5px solid ${sel?"#7c3aed":T.inputBorder}`,background:sel?"#f3e8ff":T.card,fontFamily:"inherit",cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{fontSize:13,fontWeight:sel?700:400,color:sel?"#7c3aed":T.text}}>{slot}</span>
               {occ&&<span style={{fontSize:11,color:T.textMuted}}>{occ.name}</span>}
-            </button>; })}
+            </button>;
+          })}
         </div>
         <button disabled={elodieSelectedSlots.length===0} onClick={()=>assignElodieDish(elodiePendingDish,elodieSelectedSlots)} style={{...s.primary,width:"100%",background:"#7c3aed",opacity:elodieSelectedSlots.length===0?0.5:1}}>
           {elodieSelectedSlots.length===0?"Sélectionne un créneau":`Planifier (${elodieSelectedSlots.length} créneau${elodieSelectedSlots.length>1?"x":""})`}
         </button>
       </Modal>}
 
+      {/* Historique semaine Élodie */}
       {elodieHistoryWeek&&<Modal title={`Semaine du ${elodieHistoryWeek}`} onClose={()=>setElodieHistoryWeek(null)}>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {ALL_SLOTS.map(slot=>{ const entry=elodieWeekPlans[elodieHistoryWeek]?.[slot]; if(!entry)return null;
-            return <div key={slot} style={{...s.card,display:"flex",alignItems:"center",gap:10}}><div style={{width:36,height:36,borderRadius:10,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,overflow:"hidden",flexShrink:0}}>{entry.photo?<img src={entry.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}</div><div><div style={{fontSize:11,color:T.textMuted}}>{slot}</div><div style={{fontSize:14,fontWeight:700,color:T.text}}>{entry.name}</div></div></div>; })}
+          {ALL_SLOTS.map(slot=>{const entry=elodieWeekPlans[elodieHistoryWeek]?.[slot];if(!entry)return null;return <div key={slot} style={{...s.card,display:"flex",alignItems:"center",gap:10}}><div style={{width:36,height:36,borderRadius:10,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,overflow:"hidden",flexShrink:0}}>{entry.photo?<img src={entry.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}</div><div><div style={{fontSize:11,color:T.textMuted}}>{slot}</div><div style={{fontSize:14,fontWeight:700,color:T.text}}>{entry.name}</div></div></div>;})}
           {ALL_SLOTS.every(x=>!elodieWeekPlans[elodieHistoryWeek]?.[x])&&<div style={{textAlign:"center",color:T.textLight,padding:"24px 0"}}>Aucun repas planifié</div>}
         </div>
       </Modal>}
 
+      {/* Confirm reset planning Élodie */}
       {elodieConfirmReset&&<Modal title="Remettre à zéro ?" onClose={()=>setElodieConfirmReset(false)}>
-        <p style={{fontSize:13,color:T.textMuted,marginBottom:16}}>Tous les repas de ton planning perso seront effacés.</p>
+        <p style={{fontSize:13,color:T.textMuted,marginBottom:16}}>Tous les repas de ta semaine perso seront effacés.</p>
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setElodieConfirmReset(false)} style={{...s.ghost,flex:1}}>Annuler</button>
           <button onClick={resetElodiePlanning} style={{...s.danger,flex:1}}>Tout effacer</button>
