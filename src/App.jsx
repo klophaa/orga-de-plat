@@ -828,6 +828,7 @@ export default function App() {
   const [addCatModal, setAddCatModal] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [dragItem, setDragItem] = useState(null);
+  const [elodieDragItem, setElodieDragItem] = useState(null);
   const [planView, setPlanView] = useState("weekday");
   const [toast, setToast] = useState(null);
   const [ratingModal, setRatingModal] = useState(null); // dish to rate
@@ -1135,6 +1136,14 @@ export default function App() {
 
   const removeFromPlan = async slot => { await setCurrentWeekPlan({...currentWeekPlan,[slot]:null}); };
 
+  const handleElodieDrop = async targetSlot => {
+    if (!elodieDragItem) return;
+    const plan = {...elodieCurrentPlan};
+    plan[targetSlot]=elodieDragItem.dish; plan[elodieDragItem.slot]=elodieCurrentPlan[targetSlot]||null;
+    await setElodieWeekPlan(plan);
+    setElodieDragItem(null);
+  };
+
   const handleDrop = async targetSlot => {
     if (!dragItem) return;
     const plan={...currentWeekPlan};
@@ -1255,11 +1264,13 @@ export default function App() {
     const dish = entry ? elodieDishes.find(d=>d.id===entry.id) : null;
     const display = dish || entry;
     const meal = slot.split(" ").pop();
+    const [over, setOver] = useState(false);
     return (
-      <div style={{background:"transparent",border:`1.5px dashed ${isWeekend?T.weekendBorder:T.weekdayBorder}`,borderRadius:10,padding:"8px 10px",minHeight:62,transition:"all 0.15s"}}>
+      <div onDragOver={e=>{e.preventDefault();setOver(true);}} onDragLeave={()=>setOver(false)} onDrop={e=>{e.preventDefault();setOver(false);handleElodieDrop(slot);}}
+        style={{background:over?(isWeekend?T.weekendBg:T.weekdayBg):"transparent",border:`1.5px ${over?"solid":"dashed"} ${over?(isWeekend?T.weekendHeader:T.weekdayHeader):(isWeekend?T.weekendBorder:T.weekdayBorder)}`,borderRadius:10,padding:"8px 10px",minHeight:62,transition:"all 0.15s"}}>
         <div style={{fontSize:10,fontWeight:700,color:isWeekend?T.weekendHeader:T.weekdayHeader,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>{meal==="midi"?"☀️ Midi":"🌙 Soir"}</div>
         {display?(
-          <div>
+          <div draggable onDragStart={()=>setElodieDragItem({slot,dish:entry})}>
             <div style={{width:"100%",aspectRatio:"4/3",borderRadius:9,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,marginBottom:6}}>
               {(display.photo||display.thumbnail)?<img src={display.thumbnail||display.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
             </div>
@@ -1953,6 +1964,7 @@ export default function App() {
       </Modal>}
 
       {planSlot&&planSlot!=="__pick__"&&<PlanPickModal slot={planSlot} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={assignDish}/>}
+      {elodiePlanSlot&&elodiePlanSlot!=="__pick__"&&<PlanPickModal slot={elodiePlanSlot} dishes={elodieDishes} T={T} s={s} onClose={()=>setElodiePlanSlot(null)} onAssign={(dish,slot)=>assignElodieDish(dish,[slot])}/>}
 
       {(showAddIdea||editIdea)&&<Modal title={editIdea?"Modifier l'idée":"Nouvelle idée"} onClose={()=>{setShowAddIdea(false);setEditIdea(null);}}>
         <IdeaForm initial={editIdea} onSave={form=>saveIdea(form,!!editIdea)} onCancel={()=>{setShowAddIdea(false);setEditIdea(null);}}/>
