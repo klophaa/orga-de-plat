@@ -1628,7 +1628,7 @@ export default function App() {
         {tab==="plan"&&<div>
           <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
             <div style={{display:"flex",background:T.segBg,borderRadius:12,padding:3,flex:1,gap:3}}>
-              [{id:"weekend",label:"🌿 W-E",color:T.weekendHeader},{id:"weekday",label:"💼 Semaine pro",color:T.weekdayHeader},{id:"weekend_next",label:"🌿 W-E pro",color:T.weekendHeader}].map(v=><button key={v.id} onClick={()=>setPlanView(v.id)} style={{flex:1,padding:"9px 4px",borderRadius:9,border:"none",background:planView===v.id?T.card:"transparent",color:planView===v.id?v.color:T.textMuted,fontWeight:planView===v.id?700:400,fontSize:11,cursor:"pointer",fontFamily:"inherit",boxShadow:planView===v.id?`0 2px 8px ${T.shadow}`:"none",whiteSpace:"nowrap"}}>{v.label}</button>)
+              {[{id:"weekend",label:"🌿 W-E",color:T.weekendHeader},{id:"weekday",label:"💼 Semaine pro",color:T.weekdayHeader},{id:"weekend_next",label:"🌿 W-E pro",color:T.weekendHeader}].map(v=><button key={v.id} onClick={()=>setPlanView(v.id)} style={{flex:1,padding:"9px 4px",borderRadius:9,border:"none",background:planView===v.id?T.card:"transparent",color:planView===v.id?v.color:T.textMuted,fontWeight:planView===v.id?700:400,fontSize:11,cursor:"pointer",fontFamily:"inherit",boxShadow:planView===v.id?`0 2px 8px ${T.shadow}`:"none",whiteSpace:"nowrap"}}>{v.label}</button>)}
             </div>
             <button onClick={()=>setConfirmResetPlan(true)} title="Remettre à zéro" style={{background:T.card,border:`1.5px solid ${T.inputBorder}`,borderRadius:10,padding:"8px 10px",cursor:"pointer",fontSize:16,color:T.danger,flexShrink:0}}>🗑️</button>
           </div>
