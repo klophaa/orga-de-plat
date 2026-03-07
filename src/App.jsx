@@ -833,6 +833,7 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [ratingModal, setRatingModal] = useState(null); // dish to rate
   const [confirmResetPlan, setConfirmResetPlan] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // {title, message, onConfirm}
 
   // ── États onglets privés Élodie ──
   const [elodieDishes, setElodieDishes] = useState([]);
@@ -1283,7 +1284,7 @@ export default function App() {
             </div>
             <div style={{display:"flex",alignItems:"center",gap:4}}>
               <div style={{flex:1,fontSize:12,fontWeight:700,color:T.text,lineHeight:1.3,wordBreak:"break-word"}}>{display.name}</div>
-              <button onClick={()=>removeElodieFromPlan(slot)} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>{"×"}</button>
+              <button onClick={()=>setConfirmAction({title:"Retirer du planning ?",message:`"${display.name}" sera retiré de ce créneau.`,onConfirm:()=>{removeElodieFromPlan(slot);setConfirmAction(null);}})} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>{"×"}</button>
             </div>
           </div>
         ):<button onClick={()=>setElodiePlanSlot(slot)} style={{background:"transparent",border:"none",color:T.textLight,fontSize:12,padding:"2px 0",cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"left"}}>{"+ Assigner"}</button>}
@@ -1370,7 +1371,7 @@ export default function App() {
             {/* Nom + bouton supprimer */}
             <div style={{display:"flex",alignItems:"center",gap:4}}>
               <div style={{flex:1,fontSize:12,fontWeight:700,color:T.text,lineHeight:1.3,wordBreak:"break-word"}}>{display.name}</div>
-              <button onClick={()=>removeFromPlan(slot)} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>{"×"}</button>
+              <button onClick={()=>setConfirmAction({title:"Retirer du planning ?",message:`"${display.name}" sera retiré de ce créneau.`,onConfirm:()=>{removeFromPlan(slot);setConfirmAction(null);}})} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>{"×"}</button>
             </div>
           </div>
         ):<button onClick={()=>setPlanSlot(slot)} style={{background:"transparent",border:"none",color:T.textLight,fontSize:12,padding:"2px 0",cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"left"}}>{"+ Assigner"}</button>}
@@ -1403,7 +1404,7 @@ export default function App() {
             </div>
             <div style={{display:"flex",alignItems:"center",gap:4}}>
               <div style={{flex:1,fontSize:12,fontWeight:700,color:T.text,lineHeight:1.3,wordBreak:"break-word"}}>{display.name}</div>
-              <button onClick={()=>removeFromNextPlan(slot)} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>{"×"}</button>
+              <button onClick={()=>setConfirmAction({title:"Retirer du planning ?",message:`"${display.name}" sera retiré de ce créneau.`,onConfirm:()=>{removeFromNextPlan(slot);setConfirmAction(null);}})} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>{"×"}</button>
             </div>
           </div>
         ):<button onClick={()=>{setPlanSlot("next:"+slot);}} style={{background:"transparent",border:"none",color:T.textLight,fontSize:12,padding:"2px 0",cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"left"}}>{"+ Assigner"}</button>}
@@ -1947,10 +1948,10 @@ export default function App() {
                 {links.filter(l=>l.url).length>0&&<div><div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Liens</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{links.filter(l=>l.url).map((l,i)=><a key={i} href={l.url} target="_blank" rel="noreferrer" style={{fontSize:13,color:T.accent,display:"flex",alignItems:"center",gap:6}}>🔗 {l.label||l.url}</a>)}</div></div>}
                 <div style={{fontSize:11,color:T.textLight,display:"flex",alignItems:"center",gap:5}}><Avatar user={d.updatedBy} size={14}/>Modifié par <strong>{d.updatedBy}</strong> · {formatTimeAgo(d.updatedAt)}</div>
                 <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{setEditDish(d);setViewDish(null);}} style={{...s.ghost,flex:1}}>✏️ Modifier</button>
+                  <button onClick={()=>setConfirmAction({title:"Modifier ce plat ?",message:`Vos modifications remplaceront les données actuelles de "${d.name}".`,onConfirm:()=>{setEditDish(d);setViewDish(null);setConfirmAction(null);}})} style={{...s.ghost,flex:1}}>✏️ Modifier</button>
                   <button onClick={()=>{setPendingDishForPlan(d);setPlanSlot("__pick__");setSelectedSlots([]);setViewDish(null);}} className="btn-anim" style={{...s.primary,flex:1}}>📅 Planifier</button>
                 </div>
-                <button onClick={()=>{deleteDish(d.id,d.name);setViewDish(null);}} style={{...s.ghost,width:"100%",color:T.danger,borderColor:T.danger}}>🗑️ Supprimer ce plat</button>
+                <button onClick={()=>setConfirmAction({title:"Supprimer ce plat ?",message:`"${d.name}" sera définitivement supprimé.`,onConfirm:()=>{deleteDish(d.id,d.name);setViewDish(null);setConfirmAction(null);}})} style={{...s.ghost,width:"100%",color:T.danger,borderColor:T.danger}}>🗑️ Supprimer ce plat</button>
               </div>
             </div>
           </div>
@@ -1982,6 +1983,14 @@ export default function App() {
       })()}
 
       {/* Modale confirmation reset planning */}
+      {confirmAction&&<Modal title={confirmAction.title} onClose={()=>setConfirmAction(null)}>
+        <p style={{color:T.textMuted,fontSize:14,marginBottom:20,lineHeight:1.5}}>{confirmAction.message}</p>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setConfirmAction(null)} style={{...s.ghost,flex:1}}>Annuler</button>
+          <button onClick={confirmAction.onConfirm} style={{...s.danger,flex:1}}>Confirmer</button>
+        </div>
+      </Modal>}
+
       {confirmResetPlan&&<Modal title="Remettre à zéro ?" onClose={()=>setConfirmResetPlan(false)}>
         <div style={{fontSize:14,color:T.textMuted,marginBottom:20,lineHeight:1.6}}>
           Tous les plats planifiés pour la semaine en cours seront supprimés. Cette action ne peut pas être annulée.
