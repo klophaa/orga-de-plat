@@ -2006,7 +2006,7 @@ export default function App() {
       </Modal>}
 
       {planSlot&&planSlot!=="__pick__"&&!planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={assignDish}/>}
-      {planSlot&&planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot.slice(5)} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={async(dish,slots)=>{const plan={...nextWeekPlan};slots.forEach(s=>{plan[s]={id:dish.id,name:dish.name,photo:dish.photo||null,thumbnail:dish.thumbnail||null};});await setNextWeekPlan(plan);logActivity(`a planifié "${dish.name}" (semaine pro)`);setPlanSlot(null);}}/>}
+      {planSlot&&planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot.slice(5)} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={async(dish,slot)=>{const plan={...nextWeekPlan};plan[slot]={id:dish.id||null,name:dish.name,photo:dish.thumbnail||dish.photo||null,thumbnail:dish.thumbnail||dish.photo||null};await setNextWeekPlan(plan);logActivity(`a planifié "${dish.name}" (semaine pro)`);setPlanSlot(null);}}/>}
       {elodiePlanSlot&&elodiePlanSlot!=="__pick__"&&<PlanPickModal slot={elodiePlanSlot} dishes={elodieDishes} T={T} s={s} onClose={()=>setElodiePlanSlot(null)} onAssign={(dish,slot)=>assignElodieDish(dish,[slot])}/>}
 
       {(showAddIdea||editIdea)&&<Modal title={editIdea?"Modifier l'idée":"Nouvelle idée"} onClose={()=>{setShowAddIdea(false);setEditIdea(null);}}>
