@@ -119,6 +119,7 @@
 // + Planning Élodie : drag & drop + saisie libre (même niveau que Théo)
 // + Confirmation avant suppression / modification / retrait du planning
 // + Chargement initial accéléré (dataLoading sur dishes au lieu de weekPlans)
+// + Cache localStorage : dishes, weekPlans, idées chargés instantanément au 2ème lancement
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -807,12 +808,12 @@ export default function App() {
   const [loginErr, setLoginErr] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
-  const [dishes, setDishes] = useState([]);
-  const [ideas, setIdeas] = useState([]);
+  const [dishes, setDishes] = useState(()=>{ try { const c=localStorage.getItem("cache_dishes"); return c?JSON.parse(c):[]; } catch{return [];} });
+  const [ideas, setIdeas] = useState(()=>{ try { const c=localStorage.getItem("cache_ideas"); return c?JSON.parse(c):[]; } catch{return [];} });
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
-  const [weekPlans, setWeekPlans] = useState({});
+  const [weekPlans, setWeekPlans] = useState(()=>{ try { const c=localStorage.getItem("cache_weekPlans"); return c?JSON.parse(c):{}; } catch{return {};} });
   const [activityFeed, setActivityFeed] = useState([]);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(()=>{ try { return !localStorage.getItem("cache_dishes"); } catch { return true; } });
 
   const [tab, setTab] = useState("dishes");
   const [modalStack, setModalStack] = useState([]); // for back button
@@ -1042,10 +1043,10 @@ export default function App() {
     if (!authUser) { setDataLoading(false); return; }
     setDataLoading(true);
     const u = [];
-    u.push(onSnapshot(collection(db,"dishes"), s=>{ setDishes(s.docs.map(d=>({id:d.id,...d.data()}))); setDataLoading(false); }));
-    u.push(onSnapshot(collection(db,"ideas"), s=>setIdeas(s.docs.map(d=>({id:d.id,...d.data()})))));
+    u.push(onSnapshot(collection(db,"dishes"), s=>{ const data=s.docs.map(d=>({id:d.id,...d.data()})); setDishes(data); try{localStorage.setItem("cache_dishes",JSON.stringify(data));}catch{}; setDataLoading(false); }));
+    u.push(onSnapshot(collection(db,"ideas"), s=>{ const data=s.docs.map(d=>({id:d.id,...d.data()})); setIdeas(data); try{localStorage.setItem("cache_ideas",JSON.stringify(data));}catch{}; }));
     u.push(onSnapshot(doc(db,"config","categories"), s=>{ if(s.exists()) setCategories(s.data().list||DEFAULT_CATEGORIES); }));
-    u.push(onSnapshot(collection(db,"weekPlans"), s=>{ const p={}; s.docs.forEach(d=>{p[d.id]=d.data();}); setWeekPlans(p); }));
+    u.push(onSnapshot(collection(db,"weekPlans"), s=>{ const p={}; s.docs.forEach(d=>{p[d.id]=d.data();}); setWeekPlans(p); try{localStorage.setItem("cache_weekPlans",JSON.stringify(p));}catch{}; }));
     u.push(onSnapshot(query(collection(db,"activity"),orderBy("ts","desc"),limit(50)), s=>setActivityFeed(s.docs.map(d=>({id:d.id,...d.data()})))));
     // Collections privées Élodie
     u.push(onSnapshot(collection(db,"elodieDishes"), s=>setElodieDishes(s.docs.map(d=>({id:d.id,...d.data()})))));
