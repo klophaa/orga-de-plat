@@ -829,7 +829,7 @@ export default function App() {
   const [newCatName, setNewCatName] = useState("");
   const [dragItem, setDragItem] = useState(null);
   const [elodieDragItem, setElodieDragItem] = useState(null);
-  const [planView, setPlanView] = useState("weekday");
+  const [planView, setPlanView] = useState("weekend");
   const [toast, setToast] = useState(null);
   const [ratingModal, setRatingModal] = useState(null); // dish to rate
   const [confirmResetPlan, setConfirmResetPlan] = useState(false);
@@ -1046,6 +1046,9 @@ export default function App() {
   const currentUser = authUser ? ALLOWED_EMAILS[authUser.email]?.displayName : null;
   const currentWeekKey = getWeekKey();
   const currentWeekPlan = weekPlans[currentWeekKey] || makeEmptyWeek();
+  const nextWeekDate = new Date(); nextWeekDate.setDate(nextWeekDate.getDate() + 7);
+  const nextWeekKey = getWeekKey(nextWeekDate);
+  const nextWeekPlan = weekPlans[nextWeekKey] || makeEmptyWeek();
 
   const handleLogin = async () => {
     setLoginLoading(true); setLoginErr("");
@@ -1062,6 +1065,10 @@ export default function App() {
   const setCurrentWeekPlan = useCallback(async plan => {
     await setDoc(doc(db,"weekPlans",currentWeekKey), plan);
   }, [currentWeekKey]);
+
+  const setNextWeekPlan = useCallback(async plan => {
+    await setDoc(doc(db,"weekPlans",nextWeekKey), plan);
+  }, [nextWeekKey]);
 
   // Simple toast (no undo)
   const showToastMsg = useCallback((msg) => {
@@ -1371,6 +1378,39 @@ export default function App() {
     );
   };
 
+  // PlanSlotNext — pour semaine pro et W-E pro (nextWeekPlan)
+  const PlanSlotNext=({slot,isWeekend})=>{
+    const entry=nextWeekPlan[slot];
+    const dish=entry?dishes.find(d=>d.id===entry.id):null;
+    const display=dish||entry;
+    const meal=slot.split(" ").pop();
+    const [over,setOver]=useState(false);
+    const removeFromNextPlan = async slot => { await setNextWeekPlan({...nextWeekPlan,[slot]:null}); };
+    const assignNextDish = async (dish, slots) => {
+      const plan={...nextWeekPlan};
+      slots.forEach(s=>{plan[s]={id:dish.id,name:dish.name,photo:dish.photo||null,thumbnail:dish.thumbnail||null};});
+      await setNextWeekPlan(plan);
+      logActivity(`a planifié "${dish.name}" (semaine pro)`);
+    };
+    return (
+      <div onDragOver={e=>{e.preventDefault();setOver(true);}} onDragLeave={()=>setOver(false)} onDrop={e=>{e.preventDefault();setOver(false);}}
+        style={{background:over?(isWeekend?T.weekendBg:T.weekdayBg):"transparent",border:`1.5px ${over?"solid":"dashed"} ${over?(isWeekend?T.weekendHeader:T.weekdayHeader):(isWeekend?T.weekendBorder:T.weekdayBorder)}`,borderRadius:10,padding:"8px 10px",minHeight:62,transition:"all 0.15s"}}>
+        <div style={{fontSize:10,fontWeight:700,color:isWeekend?T.weekendHeader:T.weekdayHeader,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>{meal==="midi"?"☀️ Midi":"🌙 Soir"}</div>
+        {display?(
+          <div>
+            <div style={{width:"100%",aspectRatio:"4/3",borderRadius:9,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,marginBottom:6}}>
+              {(display.photo||display.thumbnail)?<img src={display.thumbnail||display.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:4}}>
+              <div style={{flex:1,fontSize:12,fontWeight:700,color:T.text,lineHeight:1.3,wordBreak:"break-word"}}>{display.name}</div>
+              <button onClick={()=>removeFromNextPlan(slot)} style={{...s.iconBtn,fontSize:15,flexShrink:0}}>{"×"}</button>
+            </div>
+          </div>
+        ):<button onClick={()=>{setPlanSlot("next:"+slot);}} style={{background:"transparent",border:"none",color:T.textLight,fontSize:12,padding:"2px 0",cursor:"pointer",fontFamily:"inherit",width:"100%",textAlign:"left"}}>{"+ Assigner"}</button>}
+      </div>
+    );
+  };
+
   const Modal=({title,onClose,children})=>(
     <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.55)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
       <div style={{background:T.card,borderRadius:"22px 22px 0 0",padding:"0 24px 28px",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:`0 -20px 60px ${T.shadowMd}`}} onClick={e=>e.stopPropagation()}>
@@ -1455,6 +1495,7 @@ export default function App() {
   const groupSlots=slots=>{const m={};slots.forEach(slot=>{const p=slot.split(" ");const meal=p.pop();const day=p.join(" ");if(!m[day])m[day]={};m[day][meal]=slot;});return m;};
   const weekdayByDay=groupSlots(WEEKDAY_SLOTS);
   const weekendByDay=groupSlots(WEEKEND_SLOTS);
+  const nextWeekendByDay=groupSlots(WEEKEND_SLOTS);
 
   return (
     <div style={s.app}>
@@ -1587,13 +1628,14 @@ export default function App() {
         {tab==="plan"&&<div>
           <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
             <div style={{display:"flex",background:T.segBg,borderRadius:12,padding:3,flex:1,gap:3}}>
-              {[{id:"weekday",label:"Lun → Ven midi",icon:"💼"},{id:"weekend",label:"Ven soir → Dim",icon:"🌿"}].map(v=><button key={v.id} onClick={()=>setPlanView(v.id)} style={{flex:1,padding:"9px 6px",borderRadius:9,border:"none",background:planView===v.id?T.card:"transparent",color:planView===v.id?(v.id==="weekday"?T.weekdayHeader:T.weekendHeader):T.textMuted,fontWeight:planView===v.id?700:400,fontSize:12,cursor:"pointer",fontFamily:"inherit",boxShadow:planView===v.id?`0 2px 8px ${T.shadow}`:"none"}}>{v.icon} {v.label}</button>)}
+              [{id:"weekend",label:"🌿 W-E",color:T.weekendHeader},{id:"weekday",label:"💼 Semaine pro",color:T.weekdayHeader},{id:"weekend_next",label:"🌿 W-E pro",color:T.weekendHeader}].map(v=><button key={v.id} onClick={()=>setPlanView(v.id)} style={{flex:1,padding:"9px 4px",borderRadius:9,border:"none",background:planView===v.id?T.card:"transparent",color:planView===v.id?v.color:T.textMuted,fontWeight:planView===v.id?700:400,fontSize:11,cursor:"pointer",fontFamily:"inherit",boxShadow:planView===v.id?`0 2px 8px ${T.shadow}`:"none",whiteSpace:"nowrap"}}>{v.label}</button>)
             </div>
             <button onClick={()=>setConfirmResetPlan(true)} title="Remettre à zéro" style={{background:T.card,border:`1.5px solid ${T.inputBorder}`,borderRadius:10,padding:"8px 10px",cursor:"pointer",fontSize:16,color:T.danger,flexShrink:0}}>🗑️</button>
           </div>
 
-          {planView==="weekday"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{Object.entries(weekdayByDay).map(([day,meals])=><div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:T.weekdayBorder}}><div style={{background:T.weekdayHeader,color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div><div style={{display:"grid",gridTemplateColumns:meals.soir?"1fr 1fr":"1fr",padding:8,gap:8}}>{meals.midi&&<PlanSlot slot={meals.midi} isWeekend={false}/>}{meals.soir&&<PlanSlot slot={meals.soir} isWeekend={false}/>}</div></div>)}</div>}
           {planView==="weekend"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{Object.entries(weekendByDay).map(([day,meals])=><div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:T.weekendBorder}}><div style={{background:T.weekendHeader,color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",padding:8,gap:8}}>{meals.midi&&<PlanSlot slot={meals.midi} isWeekend={true}/>}{meals.soir&&<PlanSlot slot={meals.soir} isWeekend={true}/>}</div></div>)}</div>}
+          {planView==="weekday"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{Object.entries(weekdayByDay).map(([day,meals])=><div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:T.weekdayBorder}}><div style={{background:T.weekdayHeader,color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div><div style={{display:"grid",gridTemplateColumns:meals.soir?"1fr 1fr":"1fr",padding:8,gap:8}}>{meals.midi&&<PlanSlotNext slot={meals.midi} isWeekend={false}/>}{meals.soir&&<PlanSlotNext slot={meals.soir} isWeekend={false}/>}</div></div>)}</div>}
+          {planView==="weekend_next"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{Object.entries(nextWeekendByDay).map(([day,meals])=><div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:T.weekendBorder}}><div style={{background:T.weekendHeader,color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",padding:8,gap:8}}>{meals.midi&&<PlanSlotNext slot={meals.midi} isWeekend={true}/>}{meals.soir&&<PlanSlotNext slot={meals.soir} isWeekend={true}/>}</div></div>)}</div>}
 
           {pastWeeks.length>0&&<div style={{marginTop:24}}><div style={{fontWeight:700,color:T.textMuted,fontSize:11,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>📚 Semaines passées</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{pastWeeks.map(wk=><button key={wk} onClick={()=>setHistoryWeek(wk)} style={{...s.card,padding:"10px 14px",textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div style={{fontWeight:600,color:T.text,fontSize:13}}>Semaine du {wk}</div><div style={{fontSize:11,color:T.textMuted}}>{Object.values(weekPlans[wk]||{}).filter(Boolean).length} repas</div></button>)}</div></div>}
         </div>}
@@ -1963,7 +2005,8 @@ export default function App() {
         </div>
       </Modal>}
 
-      {planSlot&&planSlot!=="__pick__"&&<PlanPickModal slot={planSlot} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={assignDish}/>}
+      {planSlot&&planSlot!=="__pick__"&&!planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={assignDish}/>}
+      {planSlot&&planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot.slice(5)} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={async(dish,slots)=>{const plan={...nextWeekPlan};slots.forEach(s=>{plan[s]={id:dish.id,name:dish.name,photo:dish.photo||null,thumbnail:dish.thumbnail||null};});await setNextWeekPlan(plan);logActivity(`a planifié "${dish.name}" (semaine pro)`);setPlanSlot(null);}}/>}
       {elodiePlanSlot&&elodiePlanSlot!=="__pick__"&&<PlanPickModal slot={elodiePlanSlot} dishes={elodieDishes} T={T} s={s} onClose={()=>setElodiePlanSlot(null)} onAssign={(dish,slot)=>assignElodieDish(dish,[slot])}/>}
 
       {(showAddIdea||editIdea)&&<Modal title={editIdea?"Modifier l'idée":"Nouvelle idée"} onClose={()=>{setShowAddIdea(false);setEditIdea(null);}}>
