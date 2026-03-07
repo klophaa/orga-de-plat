@@ -110,6 +110,15 @@
 // + Collections Firestore séparées : elodieDishes / elodieWeekPlans
 // + Totalement isolés du planning commun, de la roue et des stats
 // + Bannière violette dans chaque onglet pour signaler la nature privée
+//
+// ── v12.0 — 2026-03-07 ───────────────────────────────────────────
+// + Tri par vaisselle et temps dans l'onglet Plats (3 icônes max)
+// + Notes vaisselle et temps réduites à 3 icônes max (au lieu de 5)
+// + Ordre d'affichage : derniers plats ajoutés en premier
+// + Planning Théo : 3 vues — W-E (semaine en cours), Semaine pro, W-E pro
+// + Planning Élodie : drag & drop + saisie libre (même niveau que Théo)
+// + Confirmation avant suppression / modification / retrait du planning
+// + Chargement initial accéléré (dataLoading sur dishes au lieu de weekPlans)
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -1033,10 +1042,10 @@ export default function App() {
     if (!authUser) { setDataLoading(false); return; }
     setDataLoading(true);
     const u = [];
-    u.push(onSnapshot(collection(db,"dishes"), s=>setDishes(s.docs.map(d=>({id:d.id,...d.data()})))));
+    u.push(onSnapshot(collection(db,"dishes"), s=>{ setDishes(s.docs.map(d=>({id:d.id,...d.data()}))); setDataLoading(false); }));
     u.push(onSnapshot(collection(db,"ideas"), s=>setIdeas(s.docs.map(d=>({id:d.id,...d.data()})))));
     u.push(onSnapshot(doc(db,"config","categories"), s=>{ if(s.exists()) setCategories(s.data().list||DEFAULT_CATEGORIES); }));
-    u.push(onSnapshot(collection(db,"weekPlans"), s=>{ const p={}; s.docs.forEach(d=>{p[d.id]=d.data();}); setWeekPlans(p); setDataLoading(false); }));
+    u.push(onSnapshot(collection(db,"weekPlans"), s=>{ const p={}; s.docs.forEach(d=>{p[d.id]=d.data();}); setWeekPlans(p); }));
     u.push(onSnapshot(query(collection(db,"activity"),orderBy("ts","desc"),limit(50)), s=>setActivityFeed(s.docs.map(d=>({id:d.id,...d.data()})))));
     // Collections privées Élodie
     u.push(onSnapshot(collection(db,"elodieDishes"), s=>setElodieDishes(s.docs.map(d=>({id:d.id,...d.data()})))));
