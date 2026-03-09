@@ -120,6 +120,9 @@
 // + Confirmation avant suppression / modification / retrait du planning
 // + Chargement initial accéléré (dataLoading sur dishes au lieu de weekPlans)
 // + Cache localStorage : dishes, weekPlans, idées chargés instantanément au 2ème lancement
+//
+// ── v12.1 — 2026-03-09 ───────────────────────────────────────────
+// + PlanPickModal : liste de plats remonte au-dessus du clavier virtuel (visualViewport)
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -732,7 +735,18 @@ function WheelFreeInput({ onAdd, T, s }) {
 function PlanPickModal({ slot, dishes, T, s, onClose, onAssign }) {
   const [freeText, setFreeText] = useState("");
   const [search, setSearch] = useState("");
+  const [kbOffset, setKbOffset] = useState(0);
   const filtered = dishes.filter(d => !search || d.name.toLowerCase().includes(search.toLowerCase()));
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setKbOffset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    update();
+    return () => { vv.removeEventListener("resize", update); vv.removeEventListener("scroll", update); };
+  }, []);
 
   const handleFree = () => {
     if (!freeText.trim()) return;
@@ -747,7 +761,7 @@ function PlanPickModal({ slot, dishes, T, s, onClose, onAssign }) {
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(10,20,35,0.55)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div style={{background:T.card,borderRadius:"22px 22px 0 0",padding:"0 24px 28px",width:"100%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",boxShadow:`0 -20px 60px rgba(0,0,0,0.25)`}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:T.card,borderRadius:"22px 22px 0 0",padding:"0 24px 28px",width:"100%",maxWidth:480,maxHeight:`calc(92vh - ${kbOffset}px)`,overflowY:"auto",boxShadow:`0 -20px 60px rgba(0,0,0,0.25)`,marginBottom:kbOffset,transition:"margin-bottom 0.2s,max-height 0.2s"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"center",padding:"12px 0 20px"}}>
           <div style={{width:36,height:4,background:T.inputBorder,borderRadius:2}}/>
         </div>
@@ -780,7 +794,7 @@ function PlanPickModal({ slot, dishes, T, s, onClose, onAssign }) {
           style={{...s.input,marginBottom:10}}
           onInput={e=>setSearch(e.target.value)}
         />
-        <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:280,overflowY:"auto"}}>
+        <div style={{display:"flex",flexDirection:"column",gap:8,overflowY:"auto"}}>
           {filtered.map(d=>(
             <button key={d.id} onClick={()=>handleSelect(d)}
               style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:T.bg,border:`1.5px solid ${T.cardBorder}`,borderRadius:12,cursor:"pointer",fontFamily:"inherit",textAlign:"left",width:"100%"}}>
