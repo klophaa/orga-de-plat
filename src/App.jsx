@@ -126,8 +126,10 @@
 //
 // ── v12.2 — 2026-03-14 ───────────────────────────────────────────
 // + Onglet "Plats Élodie" visible par Théo (lecture seule, pas d'ajout/modif)
-// + Planning : toggle source plats — chaque utilisateur peut planifier avec les plats de l'autre
+// + Planning Théo : toggle source plats (ses plats / plats Élodie)
+// + Planning Élodie : toggle source plats (ses plats / plats Théo)
 // + Bannière onglet Élodie adaptée selon l'utilisateur connecté
+// + Règles Firestore : Théo peut lire elodieDishes (écriture Élodie uniquement)
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -844,6 +846,7 @@ export default function App() {
   const [planSlot, setPlanSlot] = useState(null);
   const [pendingDishForPlan, setPendingDishForPlan] = useState(null);
   const [planDishSource, setPlanDishSource] = useState("own"); // "own" | "other"
+  const [elodiePlanDishSource, setElodiePlanDishSource] = useState("own"); // "own" | "other"
   const [selectedSlots, setSelectedSlots] = useState([]);
 
   const [randomResult, setRandomResult] = useState(undefined);
@@ -1229,6 +1232,7 @@ export default function App() {
   const activeDishesForPlan = planDishSource === "other"
     ? (isElodie ? dishes : elodieDishes)
     : (isElodie ? elodieDishes : dishes);
+  const elodieActiveDishesForPlan = elodiePlanDishSource === "other" ? dishes : elodieDishes;
   const elodieWeekKey = currentWeekKey;
   const elodieCurrentPlan = elodieWeekPlans[elodieWeekKey] || makeEmptyWeek();
   const elodiePastWeeks = Object.keys(elodieWeekPlans).filter(k=>k!==elodieWeekKey).sort((a,b)=>b.localeCompare(a)).slice(0,10);
@@ -2056,7 +2060,7 @@ export default function App() {
 
       {planSlot&&planSlot!=="__pick__"&&!planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot} dishes={activeDishesForPlan} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={assignDish}/>}
       {planSlot&&planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot.slice(5)} dishes={activeDishesForPlan} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={async(dish,slot)=>{const plan={...nextWeekPlan};plan[slot]={id:dish.id||null,name:dish.name,photo:dish.thumbnail||dish.photo||null,thumbnail:dish.thumbnail||dish.photo||null};await setNextWeekPlan(plan);logActivity(`a planifié "${dish.name}" (semaine pro)`);setPlanSlot(null);}}/>}
-      {elodiePlanSlot&&elodiePlanSlot!=="__pick__"&&<PlanPickModal slot={elodiePlanSlot} dishes={elodieDishes} T={T} s={s} onClose={()=>setElodiePlanSlot(null)} onAssign={(dish,slot)=>assignElodieDish(dish,[slot])}/>}
+      {elodiePlanSlot&&elodiePlanSlot!=="__pick__"&&<PlanPickModal slot={elodiePlanSlot} dishes={elodieActiveDishesForPlan} T={T} s={s} onClose={()=>setElodiePlanSlot(null)} onAssign={(dish,slot)=>assignElodieDish(dish,[slot])}/>}
 
       {(showAddIdea||editIdea)&&<Modal title={editIdea?"Modifier l'idée":"Nouvelle idée"} onClose={()=>{setShowAddIdea(false);setEditIdea(null);}}>
         <IdeaForm initial={editIdea} onSave={form=>saveIdea(form,!!editIdea)} onCancel={()=>{setShowAddIdea(false);setEditIdea(null);}}/>
@@ -2127,11 +2131,17 @@ export default function App() {
               </div>
             </div>
           </div>
-          <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
+          <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
             <div style={{display:"flex",background:T.segBg,borderRadius:12,padding:3,flex:1,gap:3}}>
               {[{id:"weekday",label:"Lun → Ven midi",icon:"💼"},{id:"weekend",label:"Ven soir → Dim",icon:"🌿"}].map(v=><button key={v.id} onClick={()=>setElodiePlanView(v.id)} style={{flex:1,padding:"9px 6px",borderRadius:9,border:"none",background:elodiePlanView===v.id?T.card:"transparent",color:elodiePlanView===v.id?(v.id==="weekday"?"#7c3aed":T.weekendHeader):T.textMuted,fontWeight:elodiePlanView===v.id?700:400,fontSize:12,cursor:"pointer",fontFamily:"inherit",boxShadow:elodiePlanView===v.id?`0 2px 8px ${T.shadow}`:"none"}}>{v.icon} {v.label}</button>)}
             </div>
             <button onClick={()=>setElodieConfirmReset(true)} title="Remettre à zéro" style={{background:T.card,border:`1.5px solid ${T.inputBorder}`,borderRadius:10,padding:"8px 10px",cursor:"pointer",fontSize:16,color:T.danger,flexShrink:0}}>🗑️</button>
+          </div>
+          {/* Toggle source plats Élodie */}
+          <div style={{display:"flex",background:T.segBg,borderRadius:10,padding:2,gap:2,marginBottom:14}}>
+            {[{id:"own",label:"👩‍🍳 Mes plats"},{id:"other",label:"🧑‍🍳 Plats Théo"}].map(opt=>(
+              <button key={opt.id} onClick={()=>setElodiePlanDishSource(opt.id)} style={{flex:1,padding:"7px 8px",borderRadius:8,border:"none",background:elodiePlanDishSource===opt.id?T.card:"transparent",color:elodiePlanDishSource===opt.id?"#7c3aed":T.textMuted,fontWeight:elodiePlanDishSource===opt.id?700:400,fontSize:12,cursor:"pointer",fontFamily:"inherit",boxShadow:elodiePlanDishSource===opt.id?`0 1px 4px ${T.shadow}`:"none"}}>{opt.label}</button>
+            ))}
           </div>
           {elodiePlanView==="weekday"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{Object.entries(elodieWeekdayByDay).map(([day,meals])=><div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:"#c4b5fd"}}><div style={{background:"#7c3aed",color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div><div style={{display:"grid",gridTemplateColumns:meals.soir?"1fr 1fr":"1fr",padding:8,gap:8}}>{meals.midi&&<ElodiePlanSlot slot={meals.midi} isWeekend={false}/>}{meals.soir&&<ElodiePlanSlot slot={meals.soir} isWeekend={false}/>}</div></div>)}</div>}
           {elodiePlanView==="weekend"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{Object.entries(elodieWeekendByDay).map(([day,meals])=><div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:"#c4b5fd"}}><div style={{background:"#8b5cf6",color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",padding:8,gap:8}}>{meals.midi&&<ElodiePlanSlot slot={meals.midi} isWeekend={true}/>}{meals.soir&&<ElodiePlanSlot slot={meals.soir} isWeekend={true}/>}</div></div>)}</div>}
