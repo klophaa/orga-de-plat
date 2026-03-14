@@ -123,6 +123,11 @@
 //
 // ── v12.1 — 2026-03-09 ───────────────────────────────────────────
 // + PlanPickModal : liste de plats remonte au-dessus du clavier virtuel (visualViewport)
+//
+// ── v12.2 — 2026-03-14 ───────────────────────────────────────────
+// + Onglet "Plats Élodie" visible par Théo (lecture seule, pas d'ajout/modif)
+// + Planning : toggle source plats — chaque utilisateur peut planifier avec les plats de l'autre
+// + Bannière onglet Élodie adaptée selon l'utilisateur connecté
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -838,6 +843,7 @@ export default function App() {
   const [editIdea, setEditIdea] = useState(null);
   const [planSlot, setPlanSlot] = useState(null);
   const [pendingDishForPlan, setPendingDishForPlan] = useState(null);
+  const [planDishSource, setPlanDishSource] = useState("own"); // "own" | "other"
   const [selectedSlots, setSelectedSlots] = useState([]);
 
   const [randomResult, setRandomResult] = useState(undefined);
@@ -1219,6 +1225,10 @@ export default function App() {
 
   // ── Données calculées onglets Élodie ──
   const isElodie = currentUser === "Elodie";
+  // Source de plats active pour planifier (dépend du toggle)
+  const activeDishesForPlan = planDishSource === "other"
+    ? (isElodie ? dishes : elodieDishes)
+    : (isElodie ? elodieDishes : dishes);
   const elodieWeekKey = currentWeekKey;
   const elodieCurrentPlan = elodieWeekPlans[elodieWeekKey] || makeEmptyWeek();
   const elodiePastWeeks = Object.keys(elodieWeekPlans).filter(k=>k!==elodieWeekKey).sort((a,b)=>b.localeCompare(a)).slice(0,10);
@@ -1346,8 +1356,8 @@ export default function App() {
     {id:"random",icon:"🪄",label:"Aléatoire"},
     {id:"tools",icon:"🔧",label:"Outils"},
     {id:"suivi",icon:"🔎",label:"Suivi"},
+    {id:"elodieDishes",icon:"👩‍🍳",label:"Plats Élodie"},
     ...(isElodie ? [
-      {id:"elodieDishes",icon:"👩‍🍳",label:"Plats Élodie"},
       {id:"elodiePlan",icon:"💜",label:"Plan Élodie"},
     ] : []),
   ];
@@ -1651,11 +1661,17 @@ export default function App() {
 
         {/* ══ PLANNING ══ */}
         {tab==="plan"&&<div>
-          <div style={{display:"flex",gap:8,marginBottom:14,alignItems:"center"}}>
+          <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
             <div style={{display:"flex",background:T.segBg,borderRadius:12,padding:3,flex:1,gap:3}}>
               {[{id:"weekend",label:"🌿 W-E",color:T.weekendHeader},{id:"weekday",label:"💼 Semaine pro",color:T.weekdayHeader},{id:"weekend_next",label:"🌿 W-E pro",color:T.weekendHeader}].map(v=><button key={v.id} onClick={()=>setPlanView(v.id)} style={{flex:1,padding:"9px 4px",borderRadius:9,border:"none",background:planView===v.id?T.card:"transparent",color:planView===v.id?v.color:T.textMuted,fontWeight:planView===v.id?700:400,fontSize:11,cursor:"pointer",fontFamily:"inherit",boxShadow:planView===v.id?`0 2px 8px ${T.shadow}`:"none",whiteSpace:"nowrap"}}>{v.label}</button>)}
             </div>
             <button onClick={()=>setConfirmResetPlan(true)} title="Remettre à zéro" style={{background:T.card,border:`1.5px solid ${T.inputBorder}`,borderRadius:10,padding:"8px 10px",cursor:"pointer",fontSize:16,color:T.danger,flexShrink:0}}>🗑️</button>
+          </div>
+          {/* Toggle source plats pour planifier */}
+          <div style={{display:"flex",background:T.segBg,borderRadius:10,padding:2,gap:2,marginBottom:14}}>
+            {[{id:"own",label:isElodie?"👩‍🍳 Mes plats":"🧑‍🍳 Mes plats"},{id:"other",label:isElodie?"🧑‍🍳 Plats Théo":"👩‍🍳 Plats Élodie"}].map(opt=>(
+              <button key={opt.id} onClick={()=>setPlanDishSource(opt.id)} style={{flex:1,padding:"7px 8px",borderRadius:8,border:"none",background:planDishSource===opt.id?T.card:"transparent",color:planDishSource===opt.id?T.accent:T.textMuted,fontWeight:planDishSource===opt.id?700:400,fontSize:12,cursor:"pointer",fontFamily:"inherit",boxShadow:planDishSource===opt.id?`0 1px 4px ${T.shadow}`:"none"}}>{opt.label}</button>
+            ))}
           </div>
 
           {planView==="weekend"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{Object.entries(weekendByDay).map(([day,meals])=><div key={day} style={{...s.card,padding:0,overflow:"hidden",borderColor:T.weekendBorder}}><div style={{background:T.weekendHeader,color:"white",padding:"8px 14px",fontWeight:700,fontSize:13}}>{day}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",padding:8,gap:8}}>{meals.midi&&<PlanSlot slot={meals.midi} isWeekend={true}/>}{meals.soir&&<PlanSlot slot={meals.soir} isWeekend={true}/>}</div></div>)}</div>}
@@ -2038,8 +2054,8 @@ export default function App() {
         </div>
       </Modal>}
 
-      {planSlot&&planSlot!=="__pick__"&&!planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={assignDish}/>}
-      {planSlot&&planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot.slice(5)} dishes={dishes} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={async(dish,slot)=>{const plan={...nextWeekPlan};plan[slot]={id:dish.id||null,name:dish.name,photo:dish.thumbnail||dish.photo||null,thumbnail:dish.thumbnail||dish.photo||null};await setNextWeekPlan(plan);logActivity(`a planifié "${dish.name}" (semaine pro)`);setPlanSlot(null);}}/>}
+      {planSlot&&planSlot!=="__pick__"&&!planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot} dishes={activeDishesForPlan} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={assignDish}/>}
+      {planSlot&&planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot.slice(5)} dishes={activeDishesForPlan} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={async(dish,slot)=>{const plan={...nextWeekPlan};plan[slot]={id:dish.id||null,name:dish.name,photo:dish.thumbnail||dish.photo||null,thumbnail:dish.thumbnail||dish.photo||null};await setNextWeekPlan(plan);logActivity(`a planifié "${dish.name}" (semaine pro)`);setPlanSlot(null);}}/>}
       {elodiePlanSlot&&elodiePlanSlot!=="__pick__"&&<PlanPickModal slot={elodiePlanSlot} dishes={elodieDishes} T={T} s={s} onClose={()=>setElodiePlanSlot(null)} onAssign={(dish,slot)=>assignElodieDish(dish,[slot])}/>}
 
       {(showAddIdea||editIdea)&&<Modal title={editIdea?"Modifier l'idée":"Nouvelle idée"} onClose={()=>{setShowAddIdea(false);setEditIdea(null);}}>
@@ -2063,19 +2079,19 @@ export default function App() {
       </Modal>}
 
         {/* ══ PLATS ÉLODIE ══ */}
-        {tab==="elodieDishes"&&isElodie&&<div>
+        {tab==="elodieDishes"&&<div>
           <div style={{...s.card,marginBottom:12,background:"linear-gradient(135deg,#f3e8ff,#ede9fe)",border:"1.5px solid #c4b5fd"}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <div style={{fontSize:28}}>👩‍🍳</div>
               <div>
                 <div style={{fontSize:13,fontWeight:800,color:"#7c3aed"}}>Plats perso — Élodie</div>
-                <div style={{fontSize:11,color:"#8b5cf6",marginTop:2}}>Visible uniquement par toi 💜</div>
+                <div style={{fontSize:11,color:"#8b5cf6",marginTop:2}}>{isElodie?"Visible uniquement par toi 💜":"Consultation uniquement 👀"}</div>
               </div>
             </div>
           </div>
           <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center"}}>
             <button onClick={()=>setElodieSearchQ(q=>q===null?"":null)} style={{width:42,height:42,borderRadius:11,border:`1.5px solid ${elodieSearchQ!==null?T.accent:T.inputBorder}`,background:elodieSearchQ!==null?T.accentLight:T.card,cursor:"pointer",fontSize:19,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>🔍</button>
-            <button onClick={()=>setElodieShowAddDish(true)} style={{...s.primary,flex:1,padding:"10px 0",textAlign:"center",background:"#7c3aed"}}>+ Ajouter un plat</button>
+            {isElodie&&<button onClick={()=>setElodieShowAddDish(true)} style={{...s.primary,flex:1,padding:"10px 0",textAlign:"center",background:"#7c3aed"}}>+ Ajouter un plat</button>}
           </div>
           {elodieSearchQ!==null&&<div style={{marginBottom:10}}>
             <input autoFocus value={elodieSearchQ} onInput={e=>setElodieSearchQ(e.target.value)} placeholder="Rechercher..." style={{...s.input}}/>
