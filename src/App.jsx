@@ -130,6 +130,10 @@
 // + Planning Élodie : toggle source plats (ses plats / plats Théo)
 // + Bannière onglet Élodie adaptée selon l'utilisateur connecté
 // + Règles Firestore : Théo peut lire elodieDishes (écriture Élodie uniquement)
+//
+// ── v12.3 — 2026-03-25 ───────────────────────────────────────────
+// + Roue aléatoire : "Choix manuel" à gauche, "Filtre auto" à droite
+// + Roue aléatoire : clic sur le centre pour tourner (plus de bouton dédié)
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -602,7 +606,7 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       {/* Toggle mode */}
       <div style={{display:"flex",background:T.bg,borderRadius:12,padding:3,border:`1.5px solid ${T.cardBorder}`}}>
-        {[["auto","🎛️ Filtres auto"],["custom","✋ Choix manuel"]].map(([m,label])=>(
+        {[["custom","✋ Choix manuel"],["auto","🎛️ Filtre auto"]].map(([m,label])=>(
           <button key={m} onClick={()=>{setWheelMode(m);setWheelResult(null);}}
             style={{flex:1,padding:"8px 4px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:"inherit",
               fontWeight:700,fontSize:12,transition:"all 0.18s",
@@ -691,15 +695,15 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
                   transform={`rotate(${(i+0.5)*segAngle},${tx},${ty})`}>{nm}</text>
               </g>;
             })}
-            <circle cx="0" cy="0" r="20" fill="white" stroke={T.accent} strokeWidth="3"/>
-            <text x="0" y="6" textAnchor="middle" fontSize="15">🪄</text>
+            <g onClick={()=>!wheelSpinning&&spinWheel(wheelDishes)} style={{cursor:wheelSpinning?"default":"pointer"}}>
+              <circle cx="0" cy="0" r="26" fill={T.accent} opacity="0.15"/>
+              <circle cx="0" cy="0" r="20" fill="white" stroke={T.accent} strokeWidth="3"/>
+              <text x="0" y="6" textAnchor="middle" fontSize="15">{wheelSpinning?"🌀":"🎰"}</text>
+            </g>
           </svg>
         </div>
-        <button onClick={()=>spinWheel(wheelDishes)} disabled={wheelSpinning} className="btn-anim"
-          style={{...s.primary,padding:"14px 40px",fontSize:16,fontWeight:800,opacity:wheelSpinning?0.6:1,
-            background:`linear-gradient(135deg,${T.accent},${T.green})`}}>
-          {wheelSpinning?"🌀 En train de tourner…":"🎰 Tourner la roue !"}
-        </button>
+        {wheelSpinning&&<div style={{fontSize:13,color:T.textMuted,fontWeight:600,animation:"pulse 1s infinite"}}>🌀 En train de tourner…</div>}
+        {!wheelSpinning&&!wheelResult&&<div style={{fontSize:12,color:T.textLight,textAlign:"center"}}>Appuie sur le centre pour tourner !</div>}
         {wheelResult&&!wheelSpinning&&<div style={{...s.card,width:"100%",border:`2px solid ${T.accent}`}}>
           <div style={{textAlign:"center",fontWeight:800,fontSize:13,color:T.accent,marginBottom:10}}>{"✨ Ce soir c'est..."}</div>
           <div style={{display:"flex",gap:12,alignItems:"center"}}>
