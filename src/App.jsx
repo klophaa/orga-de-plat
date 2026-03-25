@@ -638,38 +638,10 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
         <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>
           {"Plats sur la roue ("+wheelCustomItems.length+"/8)"}
         </div>
-        {/* Liste des plats sélectionnés */}
-        {wheelCustomItems.length>0&&<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
-          {wheelCustomItems.map((item,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:T.bg,borderRadius:10,border:`1.5px solid ${SEG_COLORS[i%SEG_COLORS.length]}33`}}>
-              <div style={{width:8,height:8,borderRadius:4,background:SEG_COLORS[i%SEG_COLORS.length],flexShrink:0}}/>
-              <div style={{width:28,height:28,borderRadius:7,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
-                {(item.thumbnail||item.photo)?<img src={item.thumbnail||item.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
-              </div>
-              <span style={{flex:1,fontSize:12,fontWeight:600,color:T.text}}>{item.name}</span>
-              <button onClick={()=>setWheelCustomItems(prev=>prev.filter((_,j)=>j!==i))}
-                style={{background:"transparent",border:"none",color:T.danger,fontSize:16,cursor:"pointer",padding:"2px 4px",lineHeight:1}}>{"×"}</button>
-            </div>
-          ))}
-        </div>}
+
         {/* Saisie libre — en premier */}
         {wheelCustomItems.length<8&&<WheelFreeInput onAdd={name=>setWheelCustomItems(prev=>[...prev,{id:null,name,photo:null,thumbnail:null}])} T={T} s={s}/>}
-        {/* Ajouter depuis les fiches */}
-        {wheelCustomItems.length<8&&<div style={{marginTop:10}}>
-          <div style={{fontSize:11,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>+ Ajouter une fiche</div>
-          <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:5}}>
-            {dishes.filter(d=>!wheelCustomItems.find(x=>x.id===d.id)).map(d=>(
-              <button key={d.id} onClick={()=>addDishToWheel(d)}
-                style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:T.card,border:`1.5px solid ${T.cardBorder}`,borderRadius:10,cursor:"pointer",fontFamily:"inherit",textAlign:"left",width:"100%"}}>
-                <div style={{width:28,height:28,borderRadius:7,background:T.accentLight,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
-                  {(d.thumbnail||d.photo)?<img src={d.thumbnail||d.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
-                </div>
-                <span style={{fontSize:12,fontWeight:600,color:T.text}}>{d.name}</span>
-                <span style={{marginLeft:"auto",fontSize:18,color:T.accent,lineHeight:1}}>+</span>
-              </button>
-            ))}
-          </div>
-        </div>}
+
         {wheelCustomItems.length===0&&<div style={{textAlign:"center",color:T.textLight,fontSize:13,padding:"12px 0"}}>Aucun plat ajouté</div>}
       </div>}
 
