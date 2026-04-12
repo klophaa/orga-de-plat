@@ -678,21 +678,7 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
         </div>
         {wheelSpinning&&<div style={{fontSize:13,color:T.textMuted,fontWeight:600,animation:"pulse 1s infinite"}}>🌀 En train de tourner…</div>}
         {!wheelSpinning&&!wheelResult&&<div style={{fontSize:12,color:T.textLight,textAlign:"center"}}>Appuie sur le centre pour tourner !</div>}
-        {wheelResult&&!wheelSpinning&&<div style={{...s.card,width:"100%",border:`2px solid ${T.accent}`}}>
-          <div style={{textAlign:"center",fontWeight:800,fontSize:13,color:T.accent,marginBottom:10}}>{"✨ Ce soir c'est..."}</div>
-          <div style={{display:"flex",gap:12,alignItems:"center"}}>
-            <div style={{width:56,height:56,borderRadius:12,background:T.accentLight,flexShrink:0,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>
-              {(wheelResult.thumbnail||wheelResult.photo)?<img src={wheelResult.thumbnail||wheelResult.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:"🍽️"}
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontWeight:800,fontSize:16,color:T.text}}>{wheelResult.name}</div>
-            </div>
-          </div>
-          <div style={{display:"flex",gap:8,marginTop:12}}>
-            <button onClick={()=>{setWheelResult(null);spinWheel(wheelDishes);}} style={{...s.ghost,flex:1}}>{"🔄 Retourner"}</button>
-            <button className="btn-anim" onClick={()=>onPlan(wheelResult)} style={{...s.primary,flex:1}}>{"📅 Planifier"}</button>
-          </div>
-        </div>}
+
       </div>}
     </div>
   );
