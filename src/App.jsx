@@ -1941,23 +1941,24 @@ export default function App() {
             </div>;
           })()}
         </div>}
+
+        {/* ══ EXPORT / RESTAURATION ══ */}
+        <div style={{...s.card,marginTop:12}}>
+          <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>{"💾 Sauvegarde & Restauration"}</div>
+          <p style={{fontSize:12,color:T.textMuted,marginBottom:14,lineHeight:1.5}}>{"Exporte toutes tes données (plats, planning, idées) dans un fichier JSON. Tu pourras les restaurer plus tard."}</p>
+          <button onClick={exportData} style={{...s.primary,width:"100%",marginBottom:10}}>{"⬇️ Exporter mes données"}</button>
+          <div style={{position:"relative"}}>
+            <button style={{...s.ghost,width:"100%",opacity:restoring?0.6:1,pointerEvents:restoring?"none":"auto"}}>
+              {restoring?"⏳ Restauration en cours...":"⬆️ Restaurer depuis un fichier"}
+            </button>
+            <input type="file" accept=".json" onChange={e=>restoreData(e.target.files[0])}
+              style={{position:"absolute",inset:0,opacity:0,cursor:"pointer",width:"100%"}}/>
+          </div>
+          {restoreMsg&&<div style={{marginTop:10,padding:"10px 12px",borderRadius:10,background:restoreMsg.ok?"#f0fdf4":"#fff1f2",color:restoreMsg.ok?T.green:T.danger,fontSize:13,fontWeight:600}}>{restoreMsg.msg}</div>}
+          <p style={{fontSize:11,color:T.textLight,marginTop:10,lineHeight:1.4}}>{"⚠️ La restauration écrase les données existantes."}</p>
+        </div>
       </div>
 
-      {/* ══ EXPORT / RESTAURATION ══ */}
-      {tab==="outils"&&<div style={{...s.card,marginTop:12}}>
-        <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>💾 Sauvegarde & Restauration</div>
-        <p style={{fontSize:12,color:T.textMuted,marginBottom:14,lineHeight:1.5}}>Exporte toutes tes données (plats, planning, idées) dans un fichier JSON. Tu pourras les restaurer plus tard depuis ce même fichier.</p>
-        <button onClick={exportData} style={{...s.primary,width:"100%",marginBottom:10}}>⬇️ Exporter mes données</button>
-        <div style={{position:"relative"}}>
-          <button style={{...s.ghost,width:"100%",opacity:restoring?0.6:1,pointerEvents:restoring?"none":"auto"}}>
-            {restoring?"⏳ Restauration en cours...":"⬆️ Restaurer depuis un fichier"}
-          </button>
-          <input type="file" accept=".json" onChange={e=>restoreData(e.target.files[0])}
-            style={{position:"absolute",inset:0,opacity:0,cursor:"pointer",width:"100%"}}/>
-        </div>
-        {restoreMsg&&<div style={{marginTop:10,padding:"10px 12px",borderRadius:10,background:restoreMsg.ok?"#f0fdf4":"#fff1f2",color:restoreMsg.ok?T.green:T.danger,fontSize:13,fontWeight:600}}>{restoreMsg.msg}</div>}
-        <p style={{fontSize:11,color:T.textLight,marginTop:10,lineHeight:1.4}}>⚠️ La restauration écrase les données existantes. Les photos sont conservées via leurs liens.</p>
-      </div>}
 
       {/* ══ CONFETTIS ══ */}
       {showConfetti&&<div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:9999,overflow:"hidden"}}>
