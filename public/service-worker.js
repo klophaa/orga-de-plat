@@ -1,4 +1,4 @@
-const CACHE_NAME = "orga-de-plat-v2";
+const CACHE_NAME = "orga-de-plat-v3";
 
 const STATIC_ASSETS = [
   "/",
@@ -14,7 +14,7 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
-// Activation — supprime les vieux caches
+// Activation: remove old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -24,8 +24,8 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch — Network first, cache fallback
-// On ignore Firebase pour ne pas bloquer les requêtes temps réel
+// Fetch: cache first, then refresh the cache in the background.
+// Firebase requests stay network-only for realtime data.
 self.addEventListener("fetch", (event) => {
   if (
     event.request.method !== "GET" ||
@@ -37,15 +37,24 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
+  const refreshCache = fetch(event.request)
+    .then((response) => {
+      if (response && response.status === 200) {
         const clone = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        return response;
-      })
-      .catch(() =>
-        caches.match(event.request).then((cached) => cached || caches.match("/index.html"))
-      )
+      }
+      return response;
+    })
+    .catch(() => null);
+
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) {
+        event.waitUntil(refreshCache);
+        return cached;
+      }
+
+      return refreshCache.then((response) => response || caches.match("/index.html"));
+    })
   );
 });
