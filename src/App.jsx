@@ -933,6 +933,12 @@ export default function App() {
     await setDoc(doc(db,"weekPlans",nextWeekKey), plan);
   }, [nextWeekKey]);
 
+  const makePlanEntry = useCallback((dish) => ({
+    id: dish.id || null,
+    name: dish.name,
+    ...(dish.id ? {} : { photo: null, thumbnail: null })
+  }), []);
+
   // Simple toast (no undo)
   const showToastMsg = useCallback((msg) => {
     setToast(prev=>{if(prev?.timer)clearTimeout(prev.timer);return null;});
@@ -1057,18 +1063,28 @@ export default function App() {
   };
 
   const assignDish = async (dish, slot) => {
-    await setCurrentWeekPlan({...currentWeekPlan,[slot]:{id:dish.id,name:dish.name,photo:dish.thumbnail||dish.photo||null}});
-    logActivity(`a planifié "${dish.name}" (${slot})`);
-    setPlanSlot(null); setPendingDishForPlan(null);
+    try {
+      await setCurrentWeekPlan({...currentWeekPlan,[slot]:makePlanEntry(dish)});
+      logActivity(`a planifié "${dish.name}" (${slot})`);
+      setPlanSlot(null); setPendingDishForPlan(null);
+    } catch (error) {
+      console.error("Erreur assignation planning :", error);
+      showToastMsg("Impossible d'ajouter ce plat au planning : " + (error?.message || "erreur inconnue"));
+    }
   };
 
   const assignDishToMultipleSlots = async (dish, slots) => {
     if (!slots.length) return;
-    const plan={...currentWeekPlan};
-    slots.forEach(slot=>{plan[slot]={id:dish.id,name:dish.name,photo:dish.thumbnail||dish.photo||null};});
-    await setCurrentWeekPlan(plan);
-    logActivity(`a planifié "${dish.name}" sur ${slots.length} créneau${slots.length>1?"x":""}`);
-    setPlanSlot(null); setPendingDishForPlan(null); setSelectedSlots([]);
+    try {
+      const plan={...currentWeekPlan};
+      slots.forEach(slot=>{plan[slot]=makePlanEntry(dish);});
+      await setCurrentWeekPlan(plan);
+      logActivity(`a planifié "${dish.name}" sur ${slots.length} créneau${slots.length>1?"x":""}`);
+      setPlanSlot(null); setPendingDishForPlan(null); setSelectedSlots([]);
+    } catch (error) {
+      console.error("Erreur assignation planning :", error);
+      showToastMsg("Impossible d'ajouter ce plat au planning : " + (error?.message || "erreur inconnue"));
+    }
   };
 
   const removeFromPlan = async slot => { await setCurrentWeekPlan({...currentWeekPlan,[slot]:null}); };
@@ -1083,11 +1099,17 @@ export default function App() {
 
   const handleDrop = async targetSlot => {
     if (!dragItem) return;
-    const plan={...currentWeekPlan};
-    plan[targetSlot]=dragItem.dish; plan[dragItem.slot]=currentWeekPlan[targetSlot]||null;
-    await setCurrentWeekPlan(plan);
-    logActivity(`a déplacé "${dragItem.dish?.name}" → ${targetSlot}`);
-    setDragItem(null);
+    try {
+      const plan={...currentWeekPlan};
+      plan[targetSlot]=makePlanEntry(dragItem.dish);
+      plan[dragItem.slot]=currentWeekPlan[targetSlot] ? makePlanEntry(currentWeekPlan[targetSlot]) : null;
+      await setCurrentWeekPlan(plan);
+      logActivity(`a déplacé "${dragItem.dish?.name}" → ${targetSlot}`);
+      setDragItem(null);
+    } catch (error) {
+      console.error("Erreur déplacement planning :", error);
+      showToastMsg("Impossible de déplacer ce plat : " + (error?.message || "erreur inconnue"));
+    }
   };
 
   const resetPlanning = async () => {
@@ -1322,10 +1344,15 @@ export default function App() {
     const [over,setOver]=useState(false);
     const removeFromNextPlan = async slot => { await setNextWeekPlan({...nextWeekPlan,[slot]:null}); };
     const assignNextDish = async (dish, slots) => {
-      const plan={...nextWeekPlan};
-      slots.forEach(s=>{plan[s]={id:dish.id,name:dish.name,photo:dish.photo||null,thumbnail:dish.thumbnail||null};});
-      await setNextWeekPlan(plan);
-      logActivity(`a planifié "${dish.name}" (semaine pro)`);
+      try {
+        const plan={...nextWeekPlan};
+        slots.forEach(s=>{plan[s]=makePlanEntry(dish);});
+        await setNextWeekPlan(plan);
+        logActivity(`a planifié "${dish.name}" (semaine pro)`);
+      } catch (error) {
+        console.error("Erreur assignation planning :", error);
+        showToastMsg("Impossible d'ajouter ce plat au planning : " + (error?.message || "erreur inconnue"));
+      }
     };
     return (
       <div onDragOver={e=>{e.preventDefault();setOver(true);}} onDragLeave={()=>setOver(false)} onDrop={e=>{e.preventDefault();setOver(false);}}
@@ -1972,7 +1999,18 @@ export default function App() {
       </Modal>}
 
       {planSlot&&planSlot!=="__pick__"&&!planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot} dishes={activeDishesForPlan} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={assignDish}/>}
-      {planSlot&&planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot.slice(5)} dishes={activeDishesForPlan} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={async(dish,slot)=>{const plan={...nextWeekPlan};plan[slot]={id:dish.id||null,name:dish.name,photo:dish.thumbnail||dish.photo||null,thumbnail:dish.thumbnail||dish.photo||null};await setNextWeekPlan(plan);logActivity(`a planifié "${dish.name}" (semaine pro)`);setPlanSlot(null);}}/>}
+      {planSlot&&planSlot.startsWith("next:")&&<PlanPickModal slot={planSlot.slice(5)} dishes={activeDishesForPlan} T={T} s={s} onClose={()=>setPlanSlot(null)} onAssign={async(dish,slot)=>{
+        try {
+          const plan={...nextWeekPlan};
+          plan[slot]=makePlanEntry(dish);
+          await setNextWeekPlan(plan);
+          logActivity(`a planifié "${dish.name}" (semaine pro)`);
+          setPlanSlot(null);
+        } catch (error) {
+          console.error("Erreur assignation planning :", error);
+          showToastMsg("Impossible d'ajouter ce plat au planning : " + (error?.message || "erreur inconnue"));
+        }
+      }}/>}
       {elodiePlanSlot&&elodiePlanSlot!=="__pick__"&&<PlanPickModal slot={elodiePlanSlot} dishes={elodieActiveDishesForPlan} T={T} s={s} onClose={()=>setElodiePlanSlot(null)} onAssign={(dish,slot)=>assignElodieDish(dish,[slot])}/>}
 
       {(showAddIdea||editIdea)&&<Modal title={editIdea?"Modifier l'idée":"Nouvelle idée"} onClose={()=>{setShowAddIdea(false);setEditIdea(null);}}>
