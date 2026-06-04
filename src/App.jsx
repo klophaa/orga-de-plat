@@ -449,6 +449,7 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
   avgTaste, spinWheel, onPlan }) {
 
   const SEG_COLORS=["#4f8ef7","#34c97e","#9b7fd4","#e07040","#4aa8b8","#d97706","#e05c6a","#5a9e78"];
+  const [selectedWheelIndex, setSelectedWheelIndex] = useState(null);
   const [editingWheelIndex, setEditingWheelIndex] = useState(null);
   const [editingWheelName, setEditingWheelName] = useState("");
   const [excludedWheelKey, setExcludedWheelKey] = useState(null);
@@ -474,11 +475,13 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
     if(wheelCustomItems.length>=8)return;
     if(wheelCustomItems.find(x=>x.id&&x.id===dish.id))return;
     setWheelCustomItems(prev=>[...prev,{id:dish.id,name:dish.name,photo:dish.thumbnail||dish.photo||null,thumbnail:dish.thumbnail||null}]);
+    setSelectedWheelIndex(null);
     setExcludedWheelKey(null);
     setWheelResult(null);
   };
 
   const startWheelEdit = (item, index) => {
+    setSelectedWheelIndex(index);
     setEditingWheelIndex(index);
     setEditingWheelName(item.name || "");
   };
@@ -487,6 +490,7 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
     const name = editingWheelName.trim();
     if (!name) return;
     setWheelCustomItems(prev=>prev.map((item,index)=>index===editingWheelIndex?{...item,name}:item));
+    setSelectedWheelIndex(editingWheelIndex);
     setEditingWheelIndex(null);
     setEditingWheelName("");
     setExcludedWheelKey(null);
@@ -495,6 +499,7 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
 
   const removeWheelItem = (index) => {
     setWheelCustomItems(prev=>prev.filter((_,i)=>i!==index));
+    setSelectedWheelIndex(null);
     setEditingWheelIndex(null);
     setEditingWheelName("");
     setExcludedWheelKey(null);
@@ -502,6 +507,9 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
   };
 
   const spinVisibleWheel = () => {
+    setSelectedWheelIndex(null);
+    setEditingWheelIndex(null);
+    setEditingWheelName("");
     setExcludedWheelKey(null);
     setTimeout(()=>spinWheel(baseWheelDishes), 0);
   };
@@ -512,16 +520,29 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
     const resultKey = getWheelKey(wheelResult, Math.max(foundIndex, 0));
     const pool = baseWheelDishes.filter((item,index)=>getWheelKey(item,index)!==resultKey);
     if (pool.length === 0) return;
+    setSelectedWheelIndex(null);
+    setEditingWheelIndex(null);
+    setEditingWheelName("");
     setExcludedWheelKey(resultKey);
     setTimeout(()=>spinWheel(pool), 0);
   };
+
+  const selectWheelSegment = (index) => {
+    if (wheelMode !== "custom" || wheelSpinning) return;
+    setSelectedWheelIndex(index);
+    setEditingWheelIndex(null);
+    setEditingWheelName("");
+    setWheelResult(null);
+  };
+
+  const selectedWheelItem = wheelMode==="custom" && selectedWheelIndex !== null ? wheelDishes[selectedWheelIndex] : null;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       {/* Toggle mode */}
       <div style={{display:"flex",background:T.bg,borderRadius:12,padding:3,border:`1.5px solid ${T.cardBorder}`}}>
         {[["custom","✋ Choix manuel"],["auto","⚙️ Filtre auto"]].map(([m,label])=>(
-          <button key={m} onClick={()=>{setWheelMode(m);setWheelResult(null);setExcludedWheelKey(null);}}
+          <button key={m} onClick={()=>{setWheelMode(m);setWheelResult(null);setExcludedWheelKey(null);setSelectedWheelIndex(null);setEditingWheelIndex(null);setEditingWheelName("");}}
             style={{flex:1,padding:"8px 4px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:"inherit",
               fontWeight:700,fontSize:12,transition:"all 0.18s",
               background:wheelMode===m?T.accent:"transparent",
@@ -552,38 +573,9 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
         </div>
 
         {/* Saisie libre — en premier */}
-        {wheelCustomItems.length<8&&<WheelFreeInput onAdd={name=>{setWheelCustomItems(prev=>[...prev,{id:null,name,photo:null,thumbnail:null}]);setExcludedWheelKey(null);setWheelResult(null);}} T={T} s={s}/>}
+        {wheelCustomItems.length<8&&<WheelFreeInput onAdd={name=>{setWheelCustomItems(prev=>[...prev,{id:null,name,photo:null,thumbnail:null}]);setSelectedWheelIndex(null);setExcludedWheelKey(null);setWheelResult(null);}} T={T} s={s}/>}
 
         {wheelCustomItems.length===0&&<div style={{textAlign:"center",color:T.textLight,fontSize:13,padding:"12px 0"}}>Aucun plat ajouté</div>}
-        {wheelCustomItems.length>0&&<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
-          {wheelCustomItems.map((item,index)=>{
-            const editing = editingWheelIndex === index;
-            return (
-              <div key={`${item.id||"free"}-${index}`} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",border:`1.5px solid ${T.cardBorder}`,borderRadius:10,background:T.bg}}>
-                <div style={{width:10,height:10,borderRadius:5,background:SEG_COLORS[index%SEG_COLORS.length],flexShrink:0}}/>
-                {editing?(
-                  <>
-                    <input
-                      value={editingWheelName}
-                      onChange={e=>setEditingWheelName(e.target.value)}
-                      onKeyDown={e=>{if(e.key==="Enter")saveWheelEdit();if(e.key==="Escape"){setEditingWheelIndex(null);setEditingWheelName("");}}}
-                      autoFocus
-                      style={{...s.input,flex:1,padding:"7px 9px",fontSize:12}}
-                    />
-                    <button title="Valider" onClick={saveWheelEdit} style={{...s.iconBtn,width:32,height:32,fontSize:14,color:T.green}}>✓</button>
-                    <button title="Annuler" onClick={()=>{setEditingWheelIndex(null);setEditingWheelName("");}} style={{...s.iconBtn,width:32,height:32,fontSize:14}}>×</button>
-                  </>
-                ):(
-                  <>
-                    <div style={{flex:1,minWidth:0,fontSize:13,fontWeight:700,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{item.name}</div>
-                    <button title="Modifier" onClick={()=>startWheelEdit(item,index)} style={{...s.iconBtn,width:32,height:32,fontSize:14}}>✎</button>
-                    <button title="Retirer" onClick={()=>removeWheelItem(index)} style={{...s.iconBtn,width:32,height:32,fontSize:18,color:T.danger}}>×</button>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>}
       </div>}
 
       {/* Roue SVG */}
@@ -603,10 +595,12 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
               const ma=((i+0.5)*segAngle-90)*Math.PI/180;
               const tx=72*Math.cos(ma),ty=72*Math.sin(ma);
               const nm=dish.name.length>9?dish.name.slice(0,8)+"…":dish.name;
-              return <g key={dish.id||i}>
-                <path d={`M0,0 L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`} fill={SEG_COLORS[i%SEG_COLORS.length]} stroke="white" strokeWidth="2.5"/>
+              const selected = wheelMode==="custom" && selectedWheelIndex===i;
+              return <g key={dish.id||i} onClick={()=>selectWheelSegment(i)} style={{cursor:wheelMode==="custom"&&!wheelSpinning?"pointer":"default"}}>
+                <path d={`M0,0 L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`} fill={SEG_COLORS[i%SEG_COLORS.length]} stroke={selected?T.text:"white"} strokeWidth={selected?5:"2.5"}/>
                 <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle"
                   fontSize={segCount>6?9:11} fontWeight="700" fill="white"
+                  pointerEvents="none"
                   transform={`rotate(${(i+0.5)*segAngle},${tx},${ty})`}>{nm}</text>
               </g>;
             })}
@@ -619,6 +613,28 @@ function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
         </div>
         {wheelSpinning&&<div style={{fontSize:13,color:T.textMuted,fontWeight:600,animation:"pulse 1s infinite"}}>🌀 En train de tourner…</div>}
         {!wheelSpinning&&!wheelResult&&<div style={{fontSize:12,color:T.textLight,textAlign:"center"}}>Appuie sur le centre pour tourner !</div>}
+        {!wheelSpinning&&selectedWheelItem&&<div style={{...s.card,width:"100%",maxWidth:380,display:"flex",alignItems:"center",gap:8,borderColor:SEG_COLORS[selectedWheelIndex%SEG_COLORS.length]}}>
+          <div style={{width:12,height:12,borderRadius:6,background:SEG_COLORS[selectedWheelIndex%SEG_COLORS.length],flexShrink:0}}/>
+          {editingWheelIndex===selectedWheelIndex?(
+            <>
+              <input
+                value={editingWheelName}
+                onChange={e=>setEditingWheelName(e.target.value)}
+                onKeyDown={e=>{if(e.key==="Enter")saveWheelEdit();if(e.key==="Escape"){setEditingWheelIndex(null);setEditingWheelName("");}}}
+                autoFocus
+                style={{...s.input,flex:1,padding:"8px 10px",fontSize:13}}
+              />
+              <button title="Valider" onClick={saveWheelEdit} style={{...s.iconBtn,width:34,height:34,fontSize:14,color:T.green}}>✓</button>
+              <button title="Annuler" onClick={()=>{setEditingWheelIndex(null);setEditingWheelName("");}} style={{...s.iconBtn,width:34,height:34,fontSize:14}}>×</button>
+            </>
+          ):(
+            <>
+              <div style={{flex:1,minWidth:0,fontSize:14,fontWeight:800,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{selectedWheelItem.name}</div>
+              <button title="Modifier" onClick={()=>startWheelEdit(selectedWheelItem,selectedWheelIndex)} style={{...s.iconBtn,width:34,height:34,fontSize:14}}>✎</button>
+              <button title="Retirer" onClick={()=>removeWheelItem(selectedWheelIndex)} style={{...s.iconBtn,width:34,height:34,fontSize:18,color:T.danger}}>×</button>
+            </>
+          )}
+        </div>}
         {!wheelSpinning&&wheelResult&&<div style={{...s.card,width:"100%",maxWidth:380,display:"flex",flexDirection:"column",gap:10,borderColor:T.accent,animation:"wheelResultPop 520ms cubic-bezier(0.2,0.9,0.25,1.25)"}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <div style={{width:48,height:48,borderRadius:12,background:T.accentLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,overflow:"hidden",flexShrink:0}}>
