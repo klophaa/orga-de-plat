@@ -685,6 +685,33 @@ function WheelFreeInput({ onAdd, T, s }) {
   );
 }
 
+function CategoryForm({ s, onSave, onCancel }) {
+  const [name, setName] = useState("");
+  const save = () => {
+    const value = name.trim();
+    if (!value) return;
+    onSave(value);
+  };
+
+  return (
+    <>
+      <label style={s.label}>Nom</label>
+      <input
+        defaultValue=""
+        onInput={e=>setName(e.currentTarget.value)}
+        style={{...s.input,marginBottom:14}}
+        placeholder="Ex: Soupe"
+        autoFocus
+        onKeyDown={e=>{if(e.key==="Enter")save();}}
+      />
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+        <button onClick={onCancel} style={s.ghost}>Annuler</button>
+        <button onClick={save} style={s.primary}>Ajouter</button>
+      </div>
+    </>
+  );
+}
+
 // ─── Modale de sélection/saisie de plat pour le planning ───────
 // Composant externe = states isolés = clavier stable sur mobile
 function PlanPickModal({ slot, dishes, T, s, onClose, onAssign }) {
@@ -807,7 +834,6 @@ export default function App() {
   const [sortBy, setSortBy] = useState(null);           // null | "dishes" | "time"
   const [historyWeek, setHistoryWeek] = useState(null);
   const [addCatModal, setAddCatModal] = useState(false);
-  const [newCatName, setNewCatName] = useState("");
   const [dragItem, setDragItem] = useState(null);
   const [elodieDragItem, setElodieDragItem] = useState(null);
   const [planView, setPlanView] = useState("weekend");
@@ -930,8 +956,10 @@ export default function App() {
     const spins = 5 + Math.random() * 5; // 5-10 tours
     const resultIdx = Math.floor(Math.random() * wheelDishes.length);
     const segAngle = 360 / wheelDishes.length;
-    // L'angle final pointe sur le résultat (pointeur en haut = 0°)
-    const targetAngle = wheelAngle + spins * 360 + (360 - resultIdx * segAngle - segAngle / 2);
+    const currentAngle = ((wheelAngle % 360) + 360) % 360;
+    const targetSegmentAngle = (360 - (resultIdx + 0.5) * segAngle) % 360;
+    const delta = (targetSegmentAngle - currentAngle + 360) % 360;
+    const targetAngle = wheelAngle + spins * 360 + delta;
     setWheelAngle(targetAngle);
     setTimeout(() => {
       setWheelSpinning(false);
@@ -2137,12 +2165,11 @@ export default function App() {
       </Modal>}
 
       {addCatModal&&<Modal title="Nouvelle catégorie" onClose={()=>setAddCatModal(false)}>
-        <label style={s.label}>Nom</label>
-        <input value={newCatName} onChange={e=>setNewCatName(e.target.value)} style={{...s.input,marginBottom:14}} placeholder="Ex: Soupe" onKeyDown={e=>{if(e.key==="Enter"&&newCatName.trim()){addCategory(newCatName.trim());setNewCatName("");setAddCatModal(false);}}}/>
-        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-          <button onClick={()=>setAddCatModal(false)} style={s.ghost}>Annuler</button>
-          <button onClick={()=>{if(newCatName.trim()){addCategory(newCatName.trim());setNewCatName("");setAddCatModal(false);}}} style={s.primary}>Ajouter</button>
-        </div>
+        <CategoryForm
+          s={s}
+          onCancel={()=>setAddCatModal(false)}
+          onSave={name=>{addCategory(name);setAddCatModal(false);}}
+        />
       </Modal>}
 
       {historyWeek&&<Modal title={`Semaine du ${historyWeek}`} onClose={()=>setHistoryWeek(null)}>
