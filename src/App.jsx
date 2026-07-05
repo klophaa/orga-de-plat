@@ -377,71 +377,6 @@ function SwipeCard({ dish, onTap, onSwipeRight, onSwipeLeft, onLongPress, T, cat
 }
 
 // ─── APP ─────────────────────────────────────────────────────────────────────
-// ─── Saisie libre du minuteur ──────────────────────────────────
-function TimerInput({ timerInitial, timerRunning, T, s, onStart }) {
-  const minsRef = useRef(null);
-  const secsRef = useRef(null);
-
-  const handleStart = () => {
-    const m = parseInt(minsRef.current?.value || "0", 10) || 0;
-    const sec = parseInt(secsRef.current?.value || "0", 10) || 0;
-    const total = m * 60 + sec;
-    if (total > 0) onStart(total);
-  };
-
-  const initMins = Math.floor(timerInitial / 60);
-  const initSecs = timerInitial % 60;
-
-  return (
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:14}}>
-      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-        <input
-          ref={minsRef}
-          type="number"
-          min="0"
-          max="99"
-          defaultValue={initMins}
-          placeholder="00"
-          style={{
-            width:64,textAlign:"center",fontSize:28,fontWeight:800,
-            border:`2px solid ${T.inputBorder}`,borderRadius:12,
-            background:T.bg,color:T.text,fontFamily:"inherit",
-            padding:"8px 4px",outline:"none"
-          }}
-          onKeyDown={e=>{if(e.key==="Enter")handleStart();}}
-        />
-        <span style={{fontSize:10,color:T.textMuted,fontWeight:600}}>MIN</span>
-      </div>
-      <span style={{fontSize:32,fontWeight:800,color:T.accent,marginBottom:14}}>:</span>
-      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-        <input
-          ref={secsRef}
-          type="number"
-          min="0"
-          max="59"
-          defaultValue={initSecs}
-          placeholder="00"
-          style={{
-            width:64,textAlign:"center",fontSize:28,fontWeight:800,
-            border:`2px solid ${T.inputBorder}`,borderRadius:12,
-            background:T.bg,color:T.text,fontFamily:"inherit",
-            padding:"8px 4px",outline:"none"
-          }}
-          onKeyDown={e=>{if(e.key==="Enter")handleStart();}}
-        />
-        <span style={{fontSize:10,color:T.textMuted,fontWeight:600}}>SEC</span>
-      </div>
-      <button
-        onClick={handleStart}
-        style={{
-          ...s.primary,padding:"12px 16px",borderRadius:12,fontSize:13,
-          fontWeight:700,alignSelf:"flex-start",marginTop:0,flexShrink:0
-        }}
-      >{"▶ Go"}</button>
-    </div>
-  );
-}
-
 // ─── Roue aléatoire — composant externe ────────────────────────
 function WheelTab({ dishes, categories, T, s, randomFilters, setRandomFilters,
   wheelAngle, wheelSpinning, wheelResult, setWheelResult,
@@ -861,11 +796,6 @@ export default function App() {
   // ── Streak ──
   const [streakCount, setStreakCount] = useState(() => load("streakCount", 0));
   const [streakLastWeek, setStreakLastWeek] = useState(() => load("streakLastWeek", null));
-  // ── Minuteur ──
-  const [timerSeconds, setTimerSeconds] = useState(null); // null = arrêté
-  const [timerRunning, setTimerRunning] = useState(false);
-  const [timerInitial, setTimerInitial] = useState(20*60);
-  const timerRef = useRef(null);
   // ── Roue aléatoire ──
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [wheelAngle, setWheelAngle] = useState(0);
@@ -919,34 +849,6 @@ export default function App() {
       }
     }
   }, [weekPlans]);
-
-  // ── Timer ──
-  useEffect(() => {
-    if (timerRunning && timerSeconds > 0) {
-      timerRef.current = setInterval(() => {
-        setTimerSeconds(s => {
-          if (s <= 1) { clearInterval(timerRef.current); setTimerRunning(false); return 0; }
-          return s - 1;
-        });
-      }, 1000);
-    } else {
-      clearInterval(timerRef.current);
-    }
-    return () => clearInterval(timerRef.current);
-  }, [timerRunning]);
-
-  const startTimer = (mins) => {
-    const secs = mins * 60;
-    setTimerInitial(secs);
-    setTimerSeconds(secs);
-    setTimerRunning(true);
-  };
-  const formatTimer = (s) => {
-    if (s === null) return "--:--";
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-  };
 
   // ── Roue aléatoire ──
   const spinWheel = (wheelDishes) => {
@@ -1423,7 +1325,6 @@ export default function App() {
     {id:"plan",icon:"📅",label:"Planning"},
     {id:"ideas",icon:"💡",label:"Idées"},
     {id:"random",icon:"🪄",label:"Aléatoire"},
-    {id:"tools",icon:"🔧",label:"Outils"},
     {id:"suivi",icon:"🔎",label:"Suivi"},
     {id:"elodieDishes",icon:"👩‍🍳",label:"Plats Élodie"},
     ...(isElodie ? [
@@ -1630,7 +1531,7 @@ export default function App() {
             </div>
           </div>
           <div style={{display:"flex",gap:6}}>
-            <button onClick={()=>signOut(auth)} style={{background:"rgba(255,255,255,0.13)",border:"1px solid rgba(255,255,255,0.28)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer",color:"white",fontFamily:"inherit",fontWeight:600}}>Quitter</button>
+            <button onClick={()=>setTab("tools")} style={{background:tab==="tools"?"rgba(255,255,255,0.24)":"rgba(255,255,255,0.13)",border:"1px solid rgba(255,255,255,0.28)",borderRadius:8,padding:"5px 10px",fontSize:11,cursor:"pointer",color:"white",fontFamily:"inherit",fontWeight:700}}>🔧 Outils</button>
           </div>
         </div>
         {/* TABS fondus dans le bandeau */}
@@ -1770,7 +1671,11 @@ export default function App() {
                     <div style={{fontWeight:700,fontSize:15,color:T.text}}>{idea.title||"Sans titre"}</div>
                     <div style={{display:"flex",gap:2}}>
                       <button onClick={()=>setEditIdea(idea)} style={s.iconBtn}>✏️</button>
-                      <button onClick={()=>deleteDoc(doc(db,"ideas",idea.id))} style={s.iconBtn}>🗑️</button>
+                      <button onClick={()=>setConfirmAction({
+                        title:"Supprimer cette idée ?",
+                        message:`"${idea.title||"Sans titre"}" sera supprimée définitivement.`,
+                        onConfirm:()=>{deleteDoc(doc(db,"ideas",idea.id));setConfirmAction(null);}
+                      })} style={s.iconBtn}>🗑️</button>
                     </div>
                   </div>
                   <div style={{fontSize:11,color:T.textMuted,marginTop:1}}>Par {idea.createdBy} · {formatTimeAgo(idea.createdAt)}</div>
@@ -1866,32 +1771,20 @@ export default function App() {
         {tab==="tools"&&<div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div style={{fontWeight:800,fontSize:16,color:T.text,marginBottom:4}}>🔧 Outils & Réglages</div>
 
-          {/* ── MINUTEUR ── */}
+          {/* ── SAUVEGARDE ── */}
           <div style={{...s.card}}>
-            <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>⏱️ Minuteur de cuisson</div>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:52,fontWeight:800,color:timerSeconds===0?"#e05c6a":T.accent,fontVariantNumeric:"tabular-nums",letterSpacing:2,marginBottom:8}}>
-                {timerSeconds===null ? formatTimer(timerInitial) : formatTimer(timerSeconds)}
-              </div>
-              {timerSeconds!==null&&timerSeconds!==timerInitial&&<div style={{width:"100%",height:8,background:T.cardBorder,borderRadius:4,overflow:"hidden",marginBottom:14}}>
-                <div style={{width:`${(timerSeconds/timerInitial)*100}%`,height:"100%",background:`linear-gradient(90deg,${T.accent},${T.green})`,borderRadius:4,transition:"width 1s linear"}}/>
-              </div>}
-              {/* Saisie libre mm:ss */}
-              <TimerInput timerInitial={timerInitial} timerRunning={timerRunning} T={T} s={s}
-                onStart={(totalSecs)=>{ setTimerInitial(totalSecs); setTimerSeconds(totalSecs); setTimerRunning(true); }}
-              />
-
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>{setTimerSeconds(timerInitial);setTimerRunning(false);}} style={{...s.ghost,flex:1,fontSize:18}}>↺</button>
-                <button onClick={()=>setTimerRunning(r=>!r)} disabled={timerSeconds===null||timerSeconds===0} className="btn-anim" style={{
-                  ...s.primary,flex:2,fontSize:15,
-                  opacity:(timerSeconds===null||timerSeconds===0)?0.5:1
-                }}>
-                  {timerRunning?"⏸ Pause":"▶ Démarrer"}
-                </button>
-              </div>
-              {timerSeconds===0&&<div style={{marginTop:12,padding:"10px",background:"#fbeaea",borderRadius:10,color:"#e05c6a",fontWeight:700,fontSize:13}}>{"🔔 C'est prêt !"}</div>}
+            <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>{"💾 Sauvegarde & Restauration"}</div>
+            <p style={{fontSize:12,color:T.textMuted,marginBottom:14,lineHeight:1.5}}>{"Exporte toutes tes données (plats, planning, idées) dans un fichier JSON. Tu pourras les restaurer plus tard."}</p>
+            <button onClick={exportData} style={{...s.primary,width:"100%",marginBottom:10}}>{"⬇️ Exporter mes données"}</button>
+            <div style={{position:"relative"}}>
+              <button style={{...s.ghost,width:"100%",opacity:restoring?0.6:1,pointerEvents:restoring?"none":"auto"}}>
+                {restoring?"⏳ Restauration en cours...":"⬆️ Restaurer depuis un fichier"}
+              </button>
+              <input type="file" accept=".json" onChange={e=>restoreData(e.target.files[0])}
+                style={{position:"absolute",inset:0,opacity:0,cursor:"pointer",width:"100%"}}/>
             </div>
+            {restoreMsg&&<div style={{marginTop:10,padding:"10px 12px",borderRadius:10,background:restoreMsg.ok?"#f0fdf4":"#fff1f2",color:restoreMsg.ok?T.green:T.danger,fontSize:13,fontWeight:600}}>{restoreMsg.msg}</div>}
+            <p style={{fontSize:11,color:T.textLight,marginTop:10,lineHeight:1.4}}>{"⚠️ La restauration écrase les données existantes."}</p>
           </div>
 
           {/* ── THÈMES ── */}
@@ -1976,22 +1869,6 @@ export default function App() {
             </div>;
           })()}
         </div>}
-
-        {/* ══ EXPORT / RESTAURATION ══ */}
-        <div style={{...s.card,marginTop:12}}>
-          <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:12}}>{"💾 Sauvegarde & Restauration"}</div>
-          <p style={{fontSize:12,color:T.textMuted,marginBottom:14,lineHeight:1.5}}>{"Exporte toutes tes données (plats, planning, idées) dans un fichier JSON. Tu pourras les restaurer plus tard."}</p>
-          <button onClick={exportData} style={{...s.primary,width:"100%",marginBottom:10}}>{"⬇️ Exporter mes données"}</button>
-          <div style={{position:"relative"}}>
-            <button style={{...s.ghost,width:"100%",opacity:restoring?0.6:1,pointerEvents:restoring?"none":"auto"}}>
-              {restoring?"⏳ Restauration en cours...":"⬆️ Restaurer depuis un fichier"}
-            </button>
-            <input type="file" accept=".json" onChange={e=>restoreData(e.target.files[0])}
-              style={{position:"absolute",inset:0,opacity:0,cursor:"pointer",width:"100%"}}/>
-          </div>
-          {restoreMsg&&<div style={{marginTop:10,padding:"10px 12px",borderRadius:10,background:restoreMsg.ok?"#f0fdf4":"#fff1f2",color:restoreMsg.ok?T.green:T.danger,fontSize:13,fontWeight:600}}>{restoreMsg.msg}</div>}
-          <p style={{fontSize:11,color:T.textLight,marginTop:10,lineHeight:1.4}}>{"⚠️ La restauration écrase les données existantes."}</p>
-        </div>
       </div>
 
 
