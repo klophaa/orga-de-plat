@@ -855,7 +855,7 @@ export default function App() {
     if (wheelSpinning || wheelDishes.length === 0) return;
     setWheelSpinning(true);
     setWheelResult(null);
-    const spins = 5 + Math.random() * 5; // 5-10 tours
+    const spins = 5 + Math.floor(Math.random() * 5); // 5-9 tours entiers
     const resultIdx = Math.floor(Math.random() * wheelDishes.length);
     const segAngle = 360 / wheelDishes.length;
     const currentAngle = ((wheelAngle % 360) + 360) % 360;
