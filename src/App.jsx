@@ -1180,6 +1180,14 @@ export default function App() {
     const weekKeys=Object.keys(weekPlans).sort((a,b)=>b.localeCompare(a));
     const dishCount={}; let totalPlanned=0;
     weekKeys.forEach(wk=>Object.values(weekPlans[wk]||{}).forEach(e=>{if(!e?.id)return;dishCount[e.id]=(dishCount[e.id]||0)+1;totalPlanned++;}));
+    const dishById=Object.fromEntries(dishes.map(d=>[d.id,d]));
+    const plannedCategories=new Set();
+    weekKeys.forEach(wk=>Object.values(weekPlans[wk]||{}).forEach(e=>{
+      (dishById[e?.id]?.categories||[]).forEach(category=>plannedCategories.add(category));
+    }));
+    const completedWeeks=weekKeys.filter(wk=>ALL_SLOTS.every(slot=>weekPlans[wk]?.[slot])).length;
+    const currentWeekUnique=new Set(Object.values(currentWeekPlan||{}).filter(Boolean).map(e=>e.id)).size;
+    const ratedDishes=dishes.filter(d=>Object.values(d.tasteByUser||{}).some(value=>value>0)).length;
     const topDishes=dishes.filter(d=>dishCount[d.id]).sort((a,b)=>(dishCount[b.id]||0)-(dishCount[a.id]||0)).slice(0,5);
     const lastCooked={};
     weekKeys.forEach(wk=>{const wd=new Date(wk);Object.values(weekPlans[wk]||{}).forEach(e=>{if(!e?.id||lastCooked[e.id])return;lastCooked[e.id]=wd;});});
@@ -1188,7 +1196,7 @@ export default function App() {
     const thisWeekDishes=Object.values(currentWeekPlan||{}).filter(Boolean).map(e=>dishes.find(d=>d.id===e.id)).filter(Boolean);
     const catDist={}; thisWeekDishes.forEach(d=>(d.categories||[]).forEach(c=>{catDist[c]=(catDist[c]||0)+1;}));
     const missingSlots=ALL_SLOTS.filter(s=>!currentWeekPlan?.[s]);
-    return {topDishes,forgottenDishes,neverCooked,catDist,missingSlots,totalPlanned,dishCount,lastCooked};
+    return {topDishes,forgottenDishes,neverCooked,catDist,missingSlots,totalPlanned,dishCount,lastCooked,uniquePlanned:Object.keys(dishCount).length,plannedCategories:plannedCategories.size,completedWeeks,currentWeekUnique,ratedDishes};
   }, [dishes, weekPlans, currentWeekPlan]);
 
   const pastWeeks=Object.keys(weekPlans).filter(k=>k!==currentWeekKey).sort((a,b)=>b.localeCompare(a)).slice(0,10);
@@ -1731,12 +1739,21 @@ export default function App() {
             const ideasTested=ideas.filter(i=>i.tested).length;
             const favCount=dishes.filter(d=>d.favorite).length;
             const BADGES=[
+              {id:"first-meal",icon:"🍴",label:"Premier pas",desc:"1 repas planifié",unlocked:totalPlanned>=1},
               {id:"cook",icon:"🏅",label:"Cuisinier du mois",desc:"20 repas planifiés",unlocked:totalPlanned>=20},
               {id:"adv",icon:"🌟",label:"Aventurier",desc:"5 idées testées",unlocked:ideasTested>=5},
               {id:"fire",icon:"🔥",label:"En feu",desc:"10 semaines de suite",unlocked:streakCount>=10},
               {id:"gourmet",icon:"⭐",label:"Gourmet",desc:"10 favoris",unlocked:favCount>=10},
               {id:"balance",icon:"🌈",label:"Équilibré",desc:"50 repas planifiés",unlocked:totalPlanned>=50},
               {id:"legend",icon:"💎",label:"Légende",desc:"50 plats enregistrés",unlocked:dishes.length>=50},
+              {id:"variety",icon:"🎨",label:"Menu varié",desc:"10 plats différents planifiés",unlocked:computeStats.uniquePlanned>=10},
+              {id:"explorer",icon:"🧭",label:"Explorateur",desc:"5 catégories cuisinées",unlocked:computeStats.plannedCategories>=5},
+              {id:"perfect-week",icon:"✅",label:"Semaine parfaite",desc:"1 semaine complète",unlocked:computeStats.completedWeeks>=1},
+              {id:"no-repeat",icon:"🔄",label:"Sans répétition",desc:"7 plats différents cette semaine",unlocked:computeStats.currentWeekUnique>=7},
+              {id:"critic",icon:"📝",label:"Critique gastronomique",desc:"10 plats notés",unlocked:computeStats.ratedDishes>=10},
+              {id:"regular",icon:"📆",label:"Régulier",desc:"4 semaines complètes",unlocked:computeStats.completedWeeks>=4},
+              {id:"ideas-machine",icon:"💡",label:"Machine à idées",desc:"10 idées testées",unlocked:ideasTested>=10},
+              {id:"big-planner",icon:"🚀",label:"Grand planificateur",desc:"100 repas planifiés",unlocked:totalPlanned>=100},
             ];
             const unlocked=BADGES.filter(b=>b.unlocked);
             const locked=BADGES.filter(b=>!b.unlocked);
