@@ -1186,7 +1186,6 @@ export default function App() {
       (dishById[e?.id]?.categories||[]).forEach(category=>plannedCategories.add(category));
     }));
     const completedWeeks=weekKeys.filter(wk=>ALL_SLOTS.every(slot=>weekPlans[wk]?.[slot])).length;
-    const currentWeekUnique=new Set(Object.values(currentWeekPlan||{}).filter(Boolean).map(e=>e.id)).size;
     const ratedDishes=dishes.filter(d=>Object.values(d.tasteByUser||{}).some(value=>value>0)).length;
     const topDishes=dishes.filter(d=>dishCount[d.id]).sort((a,b)=>(dishCount[b.id]||0)-(dishCount[a.id]||0)).slice(0,5);
     const lastCooked={};
@@ -1196,7 +1195,7 @@ export default function App() {
     const thisWeekDishes=Object.values(currentWeekPlan||{}).filter(Boolean).map(e=>dishes.find(d=>d.id===e.id)).filter(Boolean);
     const catDist={}; thisWeekDishes.forEach(d=>(d.categories||[]).forEach(c=>{catDist[c]=(catDist[c]||0)+1;}));
     const missingSlots=ALL_SLOTS.filter(s=>!currentWeekPlan?.[s]);
-    return {topDishes,forgottenDishes,neverCooked,catDist,missingSlots,totalPlanned,dishCount,lastCooked,uniquePlanned:Object.keys(dishCount).length,plannedCategories:plannedCategories.size,completedWeeks,currentWeekUnique,ratedDishes};
+    return {topDishes,forgottenDishes,neverCooked,catDist,missingSlots,totalPlanned,dishCount,lastCooked,uniquePlanned:Object.keys(dishCount).length,plannedCategories:plannedCategories.size,completedWeeks,ratedDishes};
   }, [dishes, weekPlans, currentWeekPlan]);
 
   const pastWeeks=Object.keys(weekPlans).filter(k=>k!==currentWeekKey).sort((a,b)=>b.localeCompare(a)).slice(0,10);
@@ -1752,20 +1751,45 @@ export default function App() {
               {id:"fire",icon:"🔥",label:"En feu",unit:"semaines de suite",value:streakCount,levels:[10,20,30,50,100]},
               {id:"gourmet",icon:"⭐",label:"Gourmet",unit:"favoris",value:favCount,levels:[10,20,50,100,250]},
               {id:"balance",icon:"🌈",label:"Équilibré",unit:"repas planifiés",value:totalPlanned,levels:[50,100,250,500,1000]},
-              {id:"legend",icon:"💎",label:"Légende",unit:"plats enregistrés",value:dishes.length,levels:[50,100,250,500,1000]},
-              {id:"variety",icon:"🎨",label:"Menu varié",unit:"plats différents planifiés",value:computeStats.uniquePlanned,levels:[10,25,50,100,250]},
-              {id:"explorer",icon:"🧭",label:"Explorateur",unit:"catégories cuisinées",value:computeStats.plannedCategories,levels:[5,8,12,20,30]},
+              {id:"legend",icon:"💎",label:"Légende",unit:"plats enregistrés",value:dishes.length,levels:[20,50,100,250,500]},
+              {id:"variety",icon:"🎨",label:"Menu varié",unit:"plats différents planifiés",value:computeStats.uniquePlanned,levels:[5,10,25,50,100]},
+              {id:"explorer",icon:"🧭",label:"Explorateur",unit:"catégories cuisinées",value:computeStats.plannedCategories,levels:[3,5,8,12,20]},
               {id:"perfect-week",icon:"✅",label:"Semaine parfaite",unit:"semaines complètes",value:computeStats.completedWeeks,levels:[1,4,10,25,52]},
-              {id:"no-repeat",icon:"🔄",label:"Sans répétition",unit:"plats différents cette semaine",value:computeStats.currentWeekUnique,levels:[7,10,12,14]},
               {id:"critic",icon:"📝",label:"Critique gastronomique",unit:"plats notés",value:computeStats.ratedDishes,levels:[10,25,50,100,250]},
               {id:"regular",icon:"📆",label:"Régulier",unit:"semaines complètes",value:computeStats.completedWeeks,levels:[4,10,25,52,100]},
-              {id:"ideas-machine",icon:"💡",label:"Machine à idées",unit:"idées testées",value:ideasTested,levels:[10,25,50,100,250]},
               {id:"big-planner",icon:"🚀",label:"Grand planificateur",unit:"repas planifiés",value:totalPlanned,levels:[100,250,500,1000,2500]},
             ].map(b=>({...b,...getChallengeProgress(b.value,b.levels)}));
             const unlocked=BADGES.filter(b=>b.level>=b.levels.length);
             const locked=BADGES.filter(b=>b.level<b.levels.length);
+            const totalChallengeLevels=BADGES.reduce((total,b)=>total+b.levels.length,0);
+            const completedChallengeLevels=BADGES.reduce((total,b)=>total+b.level,0);
+            const USER_LEVELS=[
+              {icon:"🥄",label:"Apprenti cuisinier"},
+              {icon:"🍳",label:"Commis de cuisine"},
+              {icon:"👨‍🍳",label:"Cuisinier confirmé"},
+              {icon:"⭐",label:"Chef de brigade"},
+              {icon:"🏆",label:"Maître des menus"},
+              {icon:"👑",label:"Roi de la cantine"},
+            ];
+            const maxRankIndex=USER_LEVELS.length-1;
+            const userLevelIndex=completedChallengeLevels>=totalChallengeLevels
+              ?maxRankIndex
+              :Math.min(maxRankIndex-1,Math.floor((completedChallengeLevels/Math.max(1,totalChallengeLevels))*maxRankIndex));
+            const userLevel=USER_LEVELS[userLevelIndex];
+            const nextUserLevel=USER_LEVELS[userLevelIndex+1];
+            const rankStart=userLevelIndex/maxRankIndex;
+            const rankEnd=nextUserLevel?(userLevelIndex+1)/maxRankIndex:1;
+            const rankProgress=nextUserLevel?Math.max(0,Math.min(100,((completedChallengeLevels/totalChallengeLevels-rankStart)/(rankEnd-rankStart))*100)):100;
             return <div style={{...s.card,marginBottom:14}}>
-              <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🏆 Badges</div>
+              <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,marginBottom:12,borderBottom:`1px solid ${T.cardBorder}`}}>
+                <div style={{fontSize:32}}>{userLevel.icon}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:15,fontWeight:800,color:T.text}}>Niveau {userLevelIndex+1} · {userLevel.label}</div>
+                  <div style={{fontSize:11,color:T.textMuted,marginTop:2}}>{completedChallengeLevels}/{totalChallengeLevels} paliers terminés{nextUserLevel?` · Prochain niveau : ${nextUserLevel.label}`:" · Niveau ultime atteint"}</div>
+                  <div style={{height:5,background:T.cardBorder,borderRadius:5,overflow:"hidden",marginTop:7}}><div style={{height:"100%",width:`${rankProgress}%`,background:userLevelIndex===maxRankIndex?T.green:T.accent,borderRadius:5}}/></div>
+                </div>
+              </div>
+              <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🏆 Défis</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                 {[...unlocked,...locked].map(b=><div key={b.id} style={{textAlign:"center",padding:"10px 6px",borderRadius:12,background:b.level>0?T.accentLight:T.bg,border:`1.5px solid ${b.level>0?T.accent:T.cardBorder}`,opacity:b.level>0?1:0.45}}>
                   <div style={{fontSize:26,filter:b.level>0?"none":"grayscale(1)"}}>{b.icon}</div>
