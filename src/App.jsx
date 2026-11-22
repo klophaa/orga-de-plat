@@ -1738,32 +1738,41 @@ export default function App() {
             const totalPlanned=computeStats.totalPlanned;
             const ideasTested=ideas.filter(i=>i.tested).length;
             const favCount=dishes.filter(d=>d.favorite).length;
+            const getChallengeProgress=(value,levels)=>{
+              const level=levels.filter(target=>value>=target).length;
+              const currentTarget=level>0?levels[level-1]:0;
+              const nextTarget=levels[level];
+              const progress=nextTarget===undefined?100:Math.max(0,Math.min(100,((value-currentTarget)/(nextTarget-currentTarget))*100));
+              return {level,nextTarget,progress};
+            };
             const BADGES=[
-              {id:"first-meal",icon:"🍴",label:"Premier pas",desc:"1 repas planifié",unlocked:totalPlanned>=1},
-              {id:"cook",icon:"🏅",label:"Cuisinier du mois",desc:"20 repas planifiés",unlocked:totalPlanned>=20},
-              {id:"adv",icon:"🌟",label:"Aventurier",desc:"5 idées testées",unlocked:ideasTested>=5},
-              {id:"fire",icon:"🔥",label:"En feu",desc:"10 semaines de suite",unlocked:streakCount>=10},
-              {id:"gourmet",icon:"⭐",label:"Gourmet",desc:"10 favoris",unlocked:favCount>=10},
-              {id:"balance",icon:"🌈",label:"Équilibré",desc:"50 repas planifiés",unlocked:totalPlanned>=50},
-              {id:"legend",icon:"💎",label:"Légende",desc:"50 plats enregistrés",unlocked:dishes.length>=50},
-              {id:"variety",icon:"🎨",label:"Menu varié",desc:"10 plats différents planifiés",unlocked:computeStats.uniquePlanned>=10},
-              {id:"explorer",icon:"🧭",label:"Explorateur",desc:"5 catégories cuisinées",unlocked:computeStats.plannedCategories>=5},
-              {id:"perfect-week",icon:"✅",label:"Semaine parfaite",desc:"1 semaine complète",unlocked:computeStats.completedWeeks>=1},
-              {id:"no-repeat",icon:"🔄",label:"Sans répétition",desc:"7 plats différents cette semaine",unlocked:computeStats.currentWeekUnique>=7},
-              {id:"critic",icon:"📝",label:"Critique gastronomique",desc:"10 plats notés",unlocked:computeStats.ratedDishes>=10},
-              {id:"regular",icon:"📆",label:"Régulier",desc:"4 semaines complètes",unlocked:computeStats.completedWeeks>=4},
-              {id:"ideas-machine",icon:"💡",label:"Machine à idées",desc:"10 idées testées",unlocked:ideasTested>=10},
-              {id:"big-planner",icon:"🚀",label:"Grand planificateur",desc:"100 repas planifiés",unlocked:totalPlanned>=100},
-            ];
-            const unlocked=BADGES.filter(b=>b.unlocked);
-            const locked=BADGES.filter(b=>!b.unlocked);
+              {id:"first-meal",icon:"🍴",label:"Premier pas",unit:"repas planifiés",value:totalPlanned,levels:[1,10,25,50,100,250]},
+              {id:"cook",icon:"🏅",label:"Cuisinier du mois",unit:"repas planifiés",value:totalPlanned,levels:[20,50,100,250,500,1000]},
+              {id:"adv",icon:"🌟",label:"Aventurier",unit:"idées testées",value:ideasTested,levels:[5,10,25,50,100]},
+              {id:"fire",icon:"🔥",label:"En feu",unit:"semaines de suite",value:streakCount,levels:[10,20,30,50,100]},
+              {id:"gourmet",icon:"⭐",label:"Gourmet",unit:"favoris",value:favCount,levels:[10,20,50,100,250]},
+              {id:"balance",icon:"🌈",label:"Équilibré",unit:"repas planifiés",value:totalPlanned,levels:[50,100,250,500,1000]},
+              {id:"legend",icon:"💎",label:"Légende",unit:"plats enregistrés",value:dishes.length,levels:[50,100,250,500,1000]},
+              {id:"variety",icon:"🎨",label:"Menu varié",unit:"plats différents planifiés",value:computeStats.uniquePlanned,levels:[10,25,50,100,250]},
+              {id:"explorer",icon:"🧭",label:"Explorateur",unit:"catégories cuisinées",value:computeStats.plannedCategories,levels:[5,8,12,20,30]},
+              {id:"perfect-week",icon:"✅",label:"Semaine parfaite",unit:"semaines complètes",value:computeStats.completedWeeks,levels:[1,4,10,25,52]},
+              {id:"no-repeat",icon:"🔄",label:"Sans répétition",unit:"plats différents cette semaine",value:computeStats.currentWeekUnique,levels:[7,10,12,14]},
+              {id:"critic",icon:"📝",label:"Critique gastronomique",unit:"plats notés",value:computeStats.ratedDishes,levels:[10,25,50,100,250]},
+              {id:"regular",icon:"📆",label:"Régulier",unit:"semaines complètes",value:computeStats.completedWeeks,levels:[4,10,25,52,100]},
+              {id:"ideas-machine",icon:"💡",label:"Machine à idées",unit:"idées testées",value:ideasTested,levels:[10,25,50,100,250]},
+              {id:"big-planner",icon:"🚀",label:"Grand planificateur",unit:"repas planifiés",value:totalPlanned,levels:[100,250,500,1000,2500]},
+            ].map(b=>({...b,...getChallengeProgress(b.value,b.levels)}));
+            const unlocked=BADGES.filter(b=>b.level>=b.levels.length);
+            const locked=BADGES.filter(b=>b.level<b.levels.length);
             return <div style={{...s.card,marginBottom:14}}>
               <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:10}}>🏆 Badges</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-                {[...unlocked,...locked].map(b=><div key={b.id} style={{textAlign:"center",padding:"10px 6px",borderRadius:12,background:b.unlocked?T.accentLight:T.bg,border:`1.5px solid ${b.unlocked?T.accent:T.cardBorder}`,opacity:b.unlocked?1:0.45}}>
-                  <div style={{fontSize:26,filter:b.unlocked?"none":"grayscale(1)"}}>{b.icon}</div>
+                {[...unlocked,...locked].map(b=><div key={b.id} style={{textAlign:"center",padding:"10px 6px",borderRadius:12,background:b.level>0?T.accentLight:T.bg,border:`1.5px solid ${b.level>0?T.accent:T.cardBorder}`,opacity:b.level>0?1:0.45}}>
+                  <div style={{fontSize:26,filter:b.level>0?"none":"grayscale(1)"}}>{b.icon}</div>
                   <div style={{fontSize:9,fontWeight:700,color:T.text,marginTop:4,lineHeight:1.3}}>{b.label}</div>
-                  <div style={{fontSize:8,color:T.textMuted,marginTop:2}}>{b.desc}</div>
+                  <div style={{fontSize:8,color:T.textMuted,marginTop:2}}>Palier {Math.min(b.level+1,b.levels.length)}/{b.levels.length}</div>
+                  <div style={{fontSize:8,color:T.textMuted,marginTop:2}}>{b.level>=b.levels.length?"Tous les paliers atteints":`${b.value} / ${b.nextTarget} ${b.unit}`}</div>
+                  <div style={{height:4,background:T.cardBorder,borderRadius:4,overflow:"hidden",marginTop:6}}><div style={{height:"100%",width:`${b.progress}%`,background:b.level>=b.levels.length?T.green:T.accent,borderRadius:4}}/></div>
                 </div>)}
               </div>
             </div>;
