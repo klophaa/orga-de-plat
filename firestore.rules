@@ -35,6 +35,15 @@ service cloud.firestore {
       allow update, delete: if false; // immuable
     }
 
+    // Notes personnelles
+    match /notes/{noteId} {
+      allow read: if isAllowed() && resource.data.ownerEmail == request.auth.token.email;
+      allow create: if isAllowed() && request.resource.data.ownerEmail == request.auth.token.email;
+      allow update: if isAllowed() && resource.data.ownerEmail == request.auth.token.email
+        && request.resource.data.ownerEmail == resource.data.ownerEmail;
+      allow delete: if isAllowed() && resource.data.ownerEmail == request.auth.token.email;
+    }
+
     // Configuration (catégories, etc.)
     match /config/{docId} {
       allow read, write: if isAllowed();

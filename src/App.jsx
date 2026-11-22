@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, addDoc, serverTimestamp, query, orderBy, limit } from "firebase/firestore";
+import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, addDoc, serverTimestamp, query, orderBy, limit, where } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAEkCPxcQERPI3m8o5XBz3TjyYOlOjlbK4",
@@ -728,6 +728,52 @@ function PlanPickModal({ slot, dishes, T, s, onClose, onAssign }) {
   );
 }
 
+function NotesTab({ notes, T, s, noteText, setNoteText, editingNoteId, setEditingNoteId, onSave, onDelete }) {
+  const editingNote = notes.find(note=>note.id===editingNoteId);
+
+  const startEditing = note => {
+    setEditingNoteId(note.id);
+    setNoteText(note.text || "");
+  };
+
+  const cancelEditing = () => {
+    setEditingNoteId(null);
+    setNoteText("");
+  };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{fontWeight:800,fontSize:16,color:T.text}}>📝 Notes personnelles</div>
+      <div style={{...s.card}}>
+        <div style={{fontWeight:700,fontSize:13,color:T.text,marginBottom:8}}>{editingNote?"Modifier la note":"Écrire une note"}</div>
+        <textarea
+          value={noteText}
+          onChange={e=>setNoteText(e.target.value)}
+          placeholder="Une idée, une envie, une liste de courses..."
+          rows={6}
+          style={{...s.input,width:"100%",resize:"vertical",lineHeight:1.5,fontFamily:"inherit",boxSizing:"border-box"}}
+        />
+        <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:10}}>
+          {editingNote&&<button onClick={cancelEditing} style={s.ghost}>Annuler</button>}
+          <button onClick={onSave} disabled={!noteText.trim()} style={{...s.primary,opacity:noteText.trim()?1:0.55}}>{editingNote?"Enregistrer les modifications":"Ajouter la note"}</button>
+        </div>
+      </div>
+
+      {notes.length===0&&<div style={{...s.card,textAlign:"center",color:T.textLight,padding:"28px 16px"}}>Aucune note pour le moment.</div>}
+      {notes.map(note=><div key={note.id} style={{...s.card,marginBottom:0}}>
+        <div style={{whiteSpace:"pre-wrap",wordBreak:"break-word",fontSize:14,color:T.text,lineHeight:1.55}}>{note.text}</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginTop:12}}>
+          <div style={{fontSize:11,color:T.textLight}}>{note.updatedAt?`Modifiée ${formatTimeAgo(note.updatedAt)}`:`Créée ${formatTimeAgo(note.createdAt)}`}</div>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>startEditing(note)} title="Modifier la note" style={{...s.iconBtn,fontSize:15}}>✏️</button>
+            <button onClick={()=>onDelete(note)} title="Supprimer la note" style={{...s.iconBtn,fontSize:15,color:T.danger}}>🗑️</button>
+          </div>
+        </div>
+      </div>)}
+    </div>
+  );
+}
+
 export default function App() {
   const [dark, setDark] = useState(() => load("dark", false));
   const [palette, setPalette] = useState(() => load("palette", "ocean"));
@@ -744,6 +790,7 @@ export default function App() {
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [weekPlans, setWeekPlans] = useState(()=>{ try { const c=localStorage.getItem("cache_weekPlans"); return c?JSON.parse(c):{}; } catch{return {};} });
   const [activityFeed, setActivityFeed] = useState([]);
+  const [notes, setNotes] = useState([]);
   const [dataLoading, setDataLoading] = useState(()=>{ try { return !localStorage.getItem("cache_dishes"); } catch { return true; } });
 
   const [tab, setTab] = useState("dishes");
@@ -773,6 +820,8 @@ export default function App() {
   const [elodieDragItem, setElodieDragItem] = useState(null);
   const [planView, setPlanView] = useState("weekend");
   const [toast, setToast] = useState(null);
+  const [noteText, setNoteText] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState(null);
   const [ratingModal, setRatingModal] = useState(null); // dish to rate
   const [confirmResetPlan, setConfirmResetPlan] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null); // {title, message, onConfirm}
@@ -949,6 +998,7 @@ export default function App() {
     u.push(onSnapshot(doc(db,"config","categories"), s=>{ if(s.exists()) setCategories(s.data().list||DEFAULT_CATEGORIES); }));
     u.push(onSnapshot(collection(db,"weekPlans"), s=>{ const p={}; s.docs.forEach(d=>{p[d.id]=d.data();}); setWeekPlans(p); try{localStorage.setItem("cache_weekPlans",JSON.stringify(p));}catch{}; }));
     u.push(onSnapshot(query(collection(db,"activity"),orderBy("ts","desc"),limit(50)), s=>setActivityFeed(s.docs.map(d=>({id:d.id,...d.data()})))));
+    u.push(onSnapshot(query(collection(db,"notes"),where("ownerEmail","==",authUser.email)), s=>setNotes(s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.updatedAt?.seconds||b.createdAt?.seconds||0)-(a.updatedAt?.seconds||a.createdAt?.seconds||0)))));
     // Collections privées Élodie
     u.push(onSnapshot(collection(db,"elodieDishes"), s=>setElodieDishes(s.docs.map(d=>({id:d.id,...d.data()})))));
     u.push(onSnapshot(collection(db,"elodieWeekPlans"), s=>{ const p={}; s.docs.forEach(d=>{p[d.id]=d.data();}); setElodieWeekPlans(p); }));
@@ -1001,6 +1051,38 @@ export default function App() {
     const timer = setTimeout(()=>setToast(null), 6000);
     setToast({msg, onUndo, timer});
   }, []);
+
+  const saveNote = async () => {
+    const text=noteText.trim();
+    if (!text || !authUser?.email) return;
+    try {
+      if (editingNoteId) {
+        await updateDoc(doc(db,"notes",editingNoteId),{text,updatedAt:serverTimestamp()});
+      } else {
+        await addDoc(collection(db,"notes"),{text,ownerEmail:authUser.email,createdBy:currentUser,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      }
+      setNoteText("");
+      setEditingNoteId(null);
+    } catch (error) {
+      console.error("Erreur note :", error);
+      showToastMsg("Impossible d'enregistrer la note : " + (error?.message || "erreur inconnue"));
+    }
+  };
+
+  const requestDeleteNote = note => setConfirmAction({
+    title:"Supprimer cette note ?",
+    message:"Cette note sera définitivement supprimée.",
+    onConfirm:async()=>{
+      try {
+        await deleteDoc(doc(db,"notes",note.id));
+        if (editingNoteId===note.id) { setEditingNoteId(null); setNoteText(""); }
+      } catch (error) {
+        console.error("Erreur suppression note :", error);
+        showToastMsg("Impossible de supprimer la note : " + (error?.message || "erreur inconnue"));
+      }
+      setConfirmAction(null);
+    }
+  });
 
   const avgTaste = d => { const v=Object.values(d.tasteByUser||{}).filter(Boolean); return v.length?v.reduce((a,b)=>a+b,0)/v.length:0; };
 
@@ -1331,7 +1413,7 @@ export default function App() {
     {id:"dishes",icon:"🥘",label:"Plats"},
     {id:"plan",icon:"📅",label:"Planning"},
     {id:"ideas",icon:"💡",label:"Idées"},
-    {id:"random",icon:"🪄",label:"Aléatoire"},
+    {id:"notes",icon:"📝",label:"Notes"},
     {id:"suivi",icon:"🔎",label:"Suivi"},
     {id:"elodieDishes",icon:"👩‍🍳",label:"Plats Élodie"},
     ...(isElodie ? [
@@ -1699,24 +1781,16 @@ export default function App() {
           </div>
         </div>}
 
-        {/* ══ ALÉATOIRE — ROUE ══ */}
-        {tab==="random"&&<WheelTab
-          dishes={dishes}
-          categories={categories}
+        {/* ══ NOTES PERSONNELLES ══ */}
+        {tab==="notes"&&<NotesTab
+          notes={notes}
           T={T} s={s}
-          randomFilters={randomFilters}
-          setRandomFilters={setRandomFilters}
-          wheelAngle={wheelAngle}
-          wheelSpinning={wheelSpinning}
-          wheelResult={wheelResult}
-          setWheelResult={setWheelResult}
-          wheelMode={wheelMode}
-          setWheelMode={setWheelMode}
-          wheelCustomItems={wheelCustomItems}
-          setWheelCustomItems={setWheelCustomItems}
-          avgTaste={avgTaste}
-          spinWheel={spinWheel}
-          onPlan={(dish)=>{setPendingDishForPlan(dish);setPlanSlot("__pick__");setSelectedSlots([]);}}
+          noteText={noteText}
+          setNoteText={setNoteText}
+          editingNoteId={editingNoteId}
+          setEditingNoteId={setEditingNoteId}
+          onSave={saveNote}
+          onDelete={requestDeleteNote}
         />}
 
         {/* ══ STATS ══ */}
